@@ -1,18 +1,16 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { fmtDmg, fmtHp, fmtRate, type Unit } from "../engine/units";
-import type { Rental } from "../engine/rentals";
 import { ENEMY_LADDER, enemyToCombatant } from "../engine/enemies";
 import type { EnemyDefinition } from "../engine/enemies";
 import { resolveBattle, type BattleResult, type CombatTick } from "../engine/combat";
 import { COMBAT_TICK_MS, COMBAT_PLAYBACK_SPEED } from "../engine/balance";
-import { battleReward, rentalBattleFee, netRentalWinnings } from "../engine/economy";
+import { battleReward } from "../engine/economy";
 import type { GameAction } from "../engine/state";
 
 type Phase = "setup" | "playing" | "result";
 
 interface Props {
   roster: Record<string, Unit>;
-  rentals: Record<string, Rental>;
   money: number;
   dispatch: (a: GameAction) => void;
   excludeUnitIds: Set<string>;
@@ -146,7 +144,7 @@ function FighterCard({
 
 // ── Main component ──
 
-export function CombatPanel({ roster, rentals, money, dispatch, excludeUnitIds, onBattlingUnitChange }: Props) {
+export function CombatPanel({ roster, money, dispatch, excludeUnitIds, onBattlingUnitChange }: Props) {
   const [unitId, setUnitId] = useState("");
   const [enemyIdx, setEnemyIdx] = useState(0);
   const [phase, setPhase] = useState<Phase>("setup");
@@ -166,10 +164,7 @@ export function CombatPanel({ roster, rentals, money, dispatch, excludeUnitIds, 
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const autoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const allUnits: Unit[] = [
-    ...Object.values(roster),
-    ...Object.values(rentals).map((r) => r.unit),
-  ].filter((u) => !excludeUnitIds.has(u.id));
+  const allUnits: Unit[] = Object.values(roster).filter((u) => !excludeUnitIds.has(u.id));
 
   const cleanup = useCallback(() => {
     if (timerRef.current) {
@@ -200,14 +195,6 @@ export function CombatPanel({ roster, rentals, money, dispatch, excludeUnitIds, 
     const unit = allUnits.find((u) => u.id === unitId);
     if (!unit) return;
 
-    const isRental = !!rentals[unitId];
-    const fee = isRental ? rentalBattleFee() : 0;
-    if (money < fee) return;
-
-    if (fee > 0) {
-      dispatch({ type: "SPEND_MONEY", amount: fee });
-    }
-
     const enemy: EnemyDefinition = ENEMY_LADDER[enemyIdx];
     const combatantLeft = { id: unit.id, stats: unit.stats };
     const combatantRight = enemyToCombatant(enemy);
@@ -222,8 +209,7 @@ export function CombatPanel({ roster, rentals, money, dispatch, excludeUnitIds, 
     setPhase("playing");
 
     if (result.winnerIndex === 0) {
-      const gross = battleReward(enemy);
-      const reward = isRental ? netRentalWinnings(gross) : gross;
+      const reward = battleReward(enemy);
       setLastReward(reward);
       setTotalWinnings((prev) => prev + reward);
       dispatch({ type: "ADD_MONEY", amount: reward });
@@ -232,7 +218,7 @@ export function CombatPanel({ roster, rentals, money, dispatch, excludeUnitIds, 
       setLastReward(0);
     }
     setBattleCount((prev) => prev + 1);
-  }, [allUnits, unitId, rentals, money, dispatch, enemyIdx]);
+  }, [allUnits, unitId, money, dispatch, enemyIdx]);
 
   // Playback timer
   useEffect(() => {
@@ -296,7 +282,6 @@ export function CombatPanel({ roster, rentals, money, dispatch, excludeUnitIds, 
             <option value="">-- select --</option>
             {allUnits.map((u) => (
               <option key={u.id} value={u.id}>
-                {rentals[u.id] ? "[R] " : ""}
                 {u.name || u.id.slice(0, 16)} (DMG:{fmtDmg(u.stats.damage)} HP:{fmtHp(u.stats.hp)})
               </option>
             ))}
@@ -315,7 +300,6 @@ export function CombatPanel({ roster, rentals, money, dispatch, excludeUnitIds, 
           </select>
         </label>
         <br />
-        {rentals[unitId] && <p style={{ color: "#fa0" }}>Rental fee: ${rentalBattleFee()}</p>}
         <button onClick={runFight} disabled={!unitId || unitBusy} style={{ marginTop: 8 }}>
           Fight!
         </button>

@@ -1,4 +1,4 @@
-import type { GameState } from "../engine/state";
+import { SAVE_VERSION, type GameState } from "../engine/state";
 
 /**
  * Abstract save/load interface.
@@ -22,7 +22,10 @@ export class LocalStorageSaveAdapter implements SaveAdapter {
     const raw = localStorage.getItem(SAVE_KEY);
     if (!raw) return null;
     try {
-      return JSON.parse(raw) as GameState;
+      const parsed = JSON.parse(raw) as GameState;
+      // Discard incompatible saves
+      if (parsed.saveVersion !== SAVE_VERSION) return null;
+      return parsed;
     } catch {
       return null;
     }

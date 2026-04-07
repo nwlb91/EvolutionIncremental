@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { fmtDmg, fmtHp, fmtRate, fmtStat, type Unit, type UnitStats } from "../engine/units";
-import type { Rental } from "../engine/rentals";
 import type { BreedingOperation } from "../engine/breeding";
 import { startBreeding, isBreedingComplete, resolveBreeding } from "../engine/breeding";
 import { BREEDING_DURATION_MS } from "../engine/balance";
@@ -32,10 +31,10 @@ function hasAnyStatImprovement(child: UnitStats, a: UnitStats, b: UnitStats): bo
 /** Does the child have any mutation that neither parent has? */
 function hasNewMutation(child: Unit, parentA: Unit, parentB: Unit): boolean {
   const parentMutIds = new Set([
-    ...parentA.mutations.map((m) => m.id),
-    ...parentB.mutations.map((m) => m.id),
+    ...parentA.mutations.map((m) => m.mutationId),
+    ...parentB.mutations.map((m) => m.mutationId),
   ]);
-  return child.mutations.some((m) => !parentMutIds.has(m.id));
+  return child.mutations.some((m) => !parentMutIds.has(m.mutationId));
 }
 
 /** Is the child at least as good as both parents on every stat in the set? */
@@ -64,7 +63,6 @@ function fmtStatByKey(stat: keyof UnitStats, value: number): string {
 
 interface Props {
   roster: Record<string, Unit>;
-  rentals: Record<string, Rental>;
   breeding: BreedingOperation | null;
   dispatch: (a: GameAction) => void;
   rng: RNG;
@@ -72,7 +70,7 @@ interface Props {
   onBreedingUnitsChange: (ids: Set<string>) => void;
 }
 
-export function BreedingPanel({ roster, rentals, breeding, dispatch, rng, excludeUnitIds, onBreedingUnitsChange }: Props) {
+export function BreedingPanel({ roster, breeding, dispatch, rng, excludeUnitIds, onBreedingUnitsChange }: Props) {
   const [parentA, setParentA] = useState<string>("");
   const [parentB, setParentB] = useState<string>("");
   const [progress, setProgress] = useState(0);
@@ -90,14 +88,11 @@ export function BreedingPanel({ roster, rentals, breeding, dispatch, rng, exclud
 
   const pendingAutoStart = useRef(false);
 
-  const allUnits: Unit[] = [
-    ...Object.values(roster),
-    ...Object.values(rentals).map((r) => r.unit),
-  ].filter((u) => !excludeUnitIds.has(u.id));
+  const allUnits: Unit[] = Object.values(roster).filter((u) => !excludeUnitIds.has(u.id));
 
   const findUnit = useCallback(
-    (id: string): Unit | undefined => roster[id] ?? rentals[id]?.unit,
-    [roster, rentals],
+    (id: string): Unit | undefined => roster[id],
+    [roster],
   );
 
   useEffect(() => {

@@ -4,7 +4,6 @@ import { MoneyDisplay } from "./ui/MoneyDisplay";
 import { RosterView } from "./ui/RosterView";
 import { BreedingPanel } from "./ui/BreedingPanel";
 import { CombatPanel } from "./ui/CombatPanel";
-import { RentalPanel } from "./ui/RentalPanel";
 import { LocalStorageSaveAdapter } from "./persistence/adapter";
 
 export default function App() {
@@ -45,7 +44,6 @@ export default function App() {
         <div>
           <CombatPanel
             roster={state.roster}
-            rentals={state.rentals}
             money={state.money}
             dispatch={dispatch}
             excludeUnitIds={breedingUnitIds}
@@ -55,16 +53,12 @@ export default function App() {
         <div>
           <BreedingPanel
             roster={state.roster}
-            rentals={state.rentals}
             breeding={state.breeding}
             dispatch={dispatch}
             rng={rng}
             excludeUnitIds={battlingUnitId ? new Set([battlingUnitId]) : new Set()}
             onBreedingUnitsChange={onBreedingUnitsChange}
           />
-        </div>
-        <div>
-          <RentalPanel rentals={state.rentals} money={state.money} dispatch={dispatch} rng={rng} />
         </div>
       </div>
 
