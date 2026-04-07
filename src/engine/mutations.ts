@@ -44,5 +44,4 @@ register({ id: "berserk",      name: "Berserk",      description: "Damage increa
 register({ id: "fortify",      name: "Fortify",      description: "Each hit taken reduces subsequent damage by a stacking percentage.",          rarity: "rare", baseRange: [0.001, 0.01] });
 
 // Legendary pool
-register({ id: "apex_predator", name: "Apex Predator", description: "All stats gain a percentage bonus. The ultimate generalist mutation.", rarity: "legendary", baseRange: [0.001, 0.01], maxTier: 5 });
-register({ id: "phoenix_blood", name: "Phoenix Blood", description: "On defeat, revive once with a percentage of max HP restored.",        rarity: "legendary", baseRange: [0.001, 0.01], maxTier: 5 });
+register({ id: "apex_predator", name: "Apex Predator", description: "All stats gain a percentage bonus. The ultimate generalist mutation.", rarity: "legendary", baseRange: [0.001, 0.01] });

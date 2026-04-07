@@ -196,7 +196,7 @@ export function CombatPanel({ roster, money, dispatch, excludeUnitIds, onBattlin
     if (!unit) return;
 
     const enemy: EnemyDefinition = ENEMY_LADDER[enemyIdx];
-    const combatantLeft = { id: unit.id, stats: unit.stats };
+    const combatantLeft = { id: unit.id, stats: unit.stats, mutations: unit.mutations };
     const combatantRight = enemyToCombatant(enemy);
     const result = resolveBattle(combatantLeft, combatantRight);
 

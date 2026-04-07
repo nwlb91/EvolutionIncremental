@@ -1,4 +1,4 @@
-import type { UnitStats } from "./units";
+import type { UnitStats, MutationInstance } from "./units";
 import { COMBAT_TICK_MS, COMBAT_MAX_TICKS } from "./balance";
 
 // ── Types ──
@@ -34,6 +34,54 @@ export interface BattleResult {
 export interface Combatant {
   id: string;
   stats: UnitStats;
+  mutations: MutationInstance[];
+}
+
+// ── Mutation helpers ──
+
+/** Sum mutation values for a specific mutation id across a combatant's mutations. */
+function mutValue(mutations: MutationInstance[], id: string): number {
+  let total = 0;
+  for (const m of mutations) {
+    if (m.mutationId === id) total += m.value;
+  }
+  return total;
+}
+
+/**
+ * Apply pre-combat stat mutations and return effective stats.
+ * - sharp_claws: +damage%
+ * - iron_jaw: +HP%
+ * - quick_twitch: -attackRate% (lower = faster)
+ * - endurance: +damage% and +HP%
+ * - apex_predator: +damage%, +HP%, -attackRate%
+ */
+export function applyStatMutations(base: UnitStats, mutations: MutationInstance[]): UnitStats {
+  let damageMult = 1;
+  let hpMult = 1;
+  let rateMult = 1;
+
+  damageMult += mutValue(mutations, "sharp_claws");
+  hpMult     += mutValue(mutations, "iron_jaw");
+  rateMult   -= mutValue(mutations, "quick_twitch");
+
+  const endurance = mutValue(mutations, "endurance");
+  damageMult += endurance;
+  hpMult     += endurance;
+
+  const apex = mutValue(mutations, "apex_predator");
+  damageMult += apex;
+  hpMult     += apex;
+  rateMult   -= apex;
+
+  // Rate multiplier can't go below 10% (safety floor)
+  rateMult = Math.max(0.1, rateMult);
+
+  return {
+    damage: base.damage * damageMult,
+    hp: base.hp * hpMult,
+    attackRateMs: base.attackRateMs * rateMult,
+  };
 }
 
 // ── Resolver ──
@@ -43,25 +91,65 @@ export interface Combatant {
  * Pure function — no side effects, fully deterministic given identical inputs.
  */
 export function resolveBattle(left: Combatant, right: Combatant): BattleResult {
+  // Apply pre-combat stat mutations
+  const effLeft = applyStatMutations(left.stats, left.mutations);
+  const effRight = applyStatMutations(right.stats, right.mutations);
+
   const state: [CombatantState, CombatantState] = [
-    { id: left.id, hp: left.stats.hp, maxHp: left.stats.hp, timerMs: left.stats.attackRateMs },
-    { id: right.id, hp: right.stats.hp, maxHp: right.stats.hp, timerMs: right.stats.attackRateMs },
+    { id: left.id, hp: effLeft.hp, maxHp: effLeft.hp, timerMs: effLeft.attackRateMs },
+    { id: right.id, hp: effRight.hp, maxHp: effRight.hp, timerMs: effRight.attackRateMs },
   ];
 
-  const stats = [left.stats, right.stats];
+  const effStats = [effLeft, effRight];
+  const muts = [left.mutations, right.mutations];
+
+  // Fortify: track stacking damage reduction per combatant
+  const fortifyStacks = [0, 0];
+
   const log: CombatTick[] = [];
 
   for (let tick = 0; tick < COMBAT_MAX_TICKS; tick++) {
     let attackerId: string | null = null;
     let damageDealt = 0;
 
+    // Regeneration: heal each combatant each tick
+    for (let i = 0; i < 2; i++) {
+      const regenPct = mutValue(muts[i], "regeneration");
+      if (regenPct > 0 && state[i].hp > 0) {
+        state[i].hp = Math.min(state[i].maxHp, state[i].hp + state[i].maxHp * regenPct);
+      }
+    }
+
     for (let i = 0; i < 2; i++) {
       state[i].timerMs -= COMBAT_TICK_MS;
       if (state[i].timerMs <= 0 && state[0].hp > 0 && state[1].hp > 0) {
         const target = 1 - i;
-        const dmg = stats[i].damage;
+
+        // Base damage
+        let dmg = effStats[i].damage;
+
+        // Berserk: bonus damage when attacker is below 50% HP
+        const berserkPct = mutValue(muts[i], "berserk");
+        if (berserkPct > 0 && state[i].hp < state[i].maxHp * 0.5) {
+          dmg *= 1 + berserkPct;
+        }
+
+        // Thick Hide: target reduces incoming damage
+        const thickHidePct = mutValue(muts[target], "thick_hide");
+        if (thickHidePct > 0) {
+          dmg *= 1 - thickHidePct;
+        }
+
+        // Fortify: target reduces incoming damage by stacking amount
+        const fortifyPct = mutValue(muts[target], "fortify");
+        if (fortifyPct > 0) {
+          dmg *= 1 - fortifyStacks[target] * fortifyPct;
+          fortifyStacks[target]++;
+        }
+
+        dmg = Math.max(0, dmg);
         state[target].hp = Math.max(0, state[target].hp - dmg);
-        state[i].timerMs += stats[i].attackRateMs;
+        state[i].timerMs += effStats[i].attackRateMs;
         attackerId = state[i].id;
         damageDealt = dmg;
       }

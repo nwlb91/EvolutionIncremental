@@ -4,8 +4,8 @@ import type { Combatant } from "../combat";
 
 describe("combat", () => {
   it("stronger unit wins", () => {
-    const strong: Combatant = { id: "s", stats: { damage: 50, hp: 200, attackRateMs: 500 } };
-    const weak: Combatant = { id: "w", stats: { damage: 5, hp: 50, attackRateMs: 1000 } };
+    const strong: Combatant = { id: "s", stats: { damage: 50, hp: 200, attackRateMs: 500 }, mutations: [] };
+    const weak: Combatant = { id: "w", stats: { damage: 5, hp: 50, attackRateMs: 1000 }, mutations: [] };
     const result = resolveBattle(strong, weak);
     expect(result.outcome).toBe("left_wins");
     expect(result.winnerIndex).toBe(0);
@@ -14,8 +14,8 @@ describe("combat", () => {
   });
 
   it("produces a tick log with HP snapshots", () => {
-    const a: Combatant = { id: "a", stats: { damage: 10, hp: 100, attackRateMs: 500 } };
-    const b: Combatant = { id: "b", stats: { damage: 10, hp: 100, attackRateMs: 500 } };
+    const a: Combatant = { id: "a", stats: { damage: 10, hp: 100, attackRateMs: 500 }, mutations: [] };
+    const b: Combatant = { id: "b", stats: { damage: 10, hp: 100, attackRateMs: 500 }, mutations: [] };
     const result = resolveBattle(a, b);
     expect(result.log.length).toBeGreaterThan(0);
     const lastTick = result.log[result.log.length - 1];
@@ -25,7 +25,7 @@ describe("combat", () => {
   });
 
   it("identical units produce a deterministic result", () => {
-    const unit: Combatant = { id: "x", stats: { damage: 10, hp: 100, attackRateMs: 1000 } };
+    const unit: Combatant = { id: "x", stats: { damage: 10, hp: 100, attackRateMs: 1000 }, mutations: [] };
     const r1 = resolveBattle(unit, { ...unit, id: "y" });
     const r2 = resolveBattle(unit, { ...unit, id: "y" });
     expect(r1.outcome).toBe(r2.outcome);

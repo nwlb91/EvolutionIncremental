@@ -41,5 +41,5 @@ export const ENEMY_LADDER: EnemyDefinition[] = Array.from(
 
 /** Convert an enemy definition to a Combatant for the combat resolver. */
 export function enemyToCombatant(enemy: EnemyDefinition): Combatant {
-  return { id: enemy.id, stats: enemy.stats };
+  return { id: enemy.id, stats: enemy.stats, mutations: [] };
 }
