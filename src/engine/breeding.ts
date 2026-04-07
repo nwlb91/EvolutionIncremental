@@ -28,13 +28,11 @@ export interface BreedingResult {
  * Each stat is independently inherited from one parent (50/50),
  * then multiplicative noise is applied.
  */
-export function breedStats(a: UnitStats, b: UnitStats, rng: RNG): UnitStats {
+export function breedStats(a: UnitStats, b: UnitStats, rng: RNG, variationFactor = BREEDING_VARIATION_FACTOR): UnitStats {
   const pick = (statA: number, statB: number, min: number, max: number): number => {
     const base = rng.next() < 0.5 ? statA : statB;
-    const pctDelta = (rng.next() * 2 - 1) * BREEDING_VARIATION_FACTOR * base;
-    // Guarantee at least ±1 is possible so rounding can't kill variation
-    const delta = pctDelta >= 0 ? Math.max(pctDelta, rng.next()) : Math.min(pctDelta, -rng.next());
-    return Math.round(Math.min(max, Math.max(min, base + delta)));
+    const variation = 1 + (rng.next() * 2 - 1) * variationFactor;
+    return Math.min(max, Math.max(min, base * variation));
   };
 
   return {
@@ -70,8 +68,9 @@ export function resolveBreeding(
   parentA: Unit,
   parentB: Unit,
   rng: RNG,
+  variationFactor?: number,
 ): BreedingResult {
-  const childStats = breedStats(parentA.stats, parentB.stats, rng);
+  const childStats = breedStats(parentA.stats, parentB.stats, rng, variationFactor);
   return {
     child: {
       id: generateUnitId(),

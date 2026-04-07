@@ -51,9 +51,9 @@ export function generateUnitId(): string {
 
 export function clampStats(stats: UnitStats): UnitStats {
   return {
-    damage: Math.round(Math.min(STAT_MAX_DAMAGE, Math.max(STAT_MIN_DAMAGE, stats.damage))),
-    hp: Math.round(Math.min(STAT_MAX_HP, Math.max(STAT_MIN_HP, stats.hp))),
-    attackRateMs: Math.round(Math.min(STAT_MAX_ATTACK_RATE_MS, Math.max(STAT_MIN_ATTACK_RATE_MS, stats.attackRateMs))),
+    damage: Math.min(STAT_MAX_DAMAGE, Math.max(STAT_MIN_DAMAGE, stats.damage)),
+    hp: Math.min(STAT_MAX_HP, Math.max(STAT_MIN_HP, stats.hp)),
+    attackRateMs: Math.min(STAT_MAX_ATTACK_RATE_MS, Math.max(STAT_MIN_ATTACK_RATE_MS, stats.attackRateMs)),
   };
 }
 
@@ -71,6 +71,12 @@ export function createStarterUnit(rng: RNG): Unit {
     mutations: [],
     parentIds: [],
   };
+}
+
+/** Format a stat value for display — rounds to 2 decimal places, trims trailing zeros. */
+export function fmtStat(value: number): string {
+  if (Number.isInteger(value)) return String(value);
+  return value.toFixed(2).replace(/\.?0+$/, "");
 }
 
 export function createUnit(

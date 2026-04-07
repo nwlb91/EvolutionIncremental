@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import type { Unit, UnitStats } from "../engine/units";
+import { fmtStat, type Unit, type UnitStats } from "../engine/units";
 import type { Rental } from "../engine/rentals";
 import type { BreedingOperation } from "../engine/breeding";
 import { startBreeding, isBreedingComplete, resolveBreeding } from "../engine/breeding";
+import { BREEDING_DURATION_MS } from "../engine/balance";
 import type { GameAction } from "../engine/state";
 import type { RNG } from "../engine/rng";
 
@@ -61,6 +62,8 @@ export function BreedingPanel({ roster, rentals, breeding, dispatch, rng, exclud
   const [keepIfStatImproved, setKeepIfStatImproved] = useState(true);
   const [keepIfNewMutation, setKeepIfNewMutation] = useState(true);
   const [lastChildInfo, setLastChildInfo] = useState<string | null>(null);
+  const [breedSpeed, setBreedSpeed] = useState(1);
+  const [variationPct, setVariationPct] = useState(1); // default 1%
 
   const pendingAutoStart = useRef(false);
 
@@ -94,6 +97,7 @@ export function BreedingPanel({ roster, rentals, breeding, dispatch, rng, exclud
     const t = setTimeout(() => {
       pendingAutoStart.current = false;
       const op = startBreeding(parentA, parentB, Date.now());
+      op.durationMs = Math.round(BREEDING_DURATION_MS / breedSpeed);
       dispatch({ type: "START_BREEDING", op });
     }, 100);
     return () => { clearTimeout(t); pendingAutoStart.current = false; };
@@ -116,7 +120,7 @@ export function BreedingPanel({ roster, rentals, breeding, dispatch, rng, exclud
         const a = findUnit(breeding.parentA);
         const b = findUnit(breeding.parentB);
         if (a && b) {
-          const result = resolveBreeding(a, b, rng);
+          const result = resolveBreeding(a, b, rng, variationPct / 100);
           const child = result.child;
           dispatch({ type: "COMPLETE_BREEDING", child });
           dispatch({ type: "UPDATE_RNG_STATE", state: rng.state() });
@@ -141,7 +145,7 @@ export function BreedingPanel({ roster, rentals, breeding, dispatch, rng, exclud
               }
               setLastChildInfo(
                 `Replaced ${worseParent.name || worseParent.id.slice(0, 12)} ` +
-                `(${statLabel(stat)}: ${worseVal} → ${childVal})`,
+                `(${statLabel(stat)}: ${fmtStat(worseVal)} → ${fmtStat(childVal)})`,
               );
               return;
             }
@@ -157,7 +161,7 @@ export function BreedingPanel({ roster, rentals, breeding, dispatch, rng, exclud
             if (!shouldKeep) {
               dispatch({ type: "REMOVE_UNIT", unitId: child.id });
               setLastChildInfo(
-                `Auto-dismissed offspring (DMG:${child.stats.damage} HP:${child.stats.hp} Rate:${child.stats.attackRateMs})`,
+                `Auto-dismissed offspring (DMG:${fmtStat(child.stats.damage)} HP:${fmtStat(child.stats.hp)} Rate:${fmtStat(child.stats.attackRateMs)})`,
               );
               return;
             } else {
@@ -169,7 +173,7 @@ export function BreedingPanel({ roster, rentals, breeding, dispatch, rng, exclud
                 reasons.push("new mutation");
               }
               setLastChildInfo(
-                `Kept offspring — ${reasons.join(", ")} (DMG:${child.stats.damage} HP:${child.stats.hp} Rate:${child.stats.attackRateMs})`,
+                `Kept offspring — ${reasons.join(", ")} (DMG:${fmtStat(child.stats.damage)} HP:${fmtStat(child.stats.hp)} Rate:${fmtStat(child.stats.attackRateMs)})`,
               );
               return;
             }
@@ -183,7 +187,7 @@ export function BreedingPanel({ roster, rentals, breeding, dispatch, rng, exclud
       }
     }, 200);
     return () => clearInterval(id);
-  }, [breeding, findUnit, rng, dispatch, autoBreed, keyStat, autoDismiss, keepIfStatImproved, keepIfNewMutation]);
+  }, [breeding, findUnit, rng, dispatch, autoBreed, keyStat, autoDismiss, keepIfStatImproved, keepIfNewMutation, variationPct]);
 
   const handleStart = () => {
     if (!parentA || !parentB || parentA === parentB) return;
@@ -209,7 +213,7 @@ export function BreedingPanel({ roster, rentals, breeding, dispatch, rng, exclud
             <option value="">-- select --</option>
             {allUnits.map((u) => (
               <option key={u.id} value={u.id}>
-                {u.name || u.id.slice(0, 16)} (DMG:{u.stats.damage} HP:{u.stats.hp} Rate:{u.stats.attackRateMs})
+                {u.name || u.id.slice(0, 16)} (DMG:{fmtStat(u.stats.damage)} HP:{fmtStat(u.stats.hp)} Rate:{fmtStat(u.stats.attackRateMs)})
               </option>
             ))}
           </select>
@@ -224,7 +228,7 @@ export function BreedingPanel({ roster, rentals, breeding, dispatch, rng, exclud
               .filter((u) => u.id !== parentA)
               .map((u) => (
                 <option key={u.id} value={u.id}>
-                  {u.name || u.id.slice(0, 16)} (DMG:{u.stats.damage} HP:{u.stats.hp} Rate:{u.stats.attackRateMs})
+                  {u.name || u.id.slice(0, 16)} (DMG:{fmtStat(u.stats.damage)} HP:{fmtStat(u.stats.hp)} Rate:{fmtStat(u.stats.attackRateMs)})
                 </option>
               ))}
           </select>
@@ -234,15 +238,51 @@ export function BreedingPanel({ roster, rentals, breeding, dispatch, rng, exclud
 
       {parentAUnit && parentBUnit && (
         <div style={{ fontSize: 11, color: "#888", marginBottom: 8, lineHeight: 1.6 }}>
-          A: DMG {parentAUnit.stats.damage} | HP {parentAUnit.stats.hp} | Rate {parentAUnit.stats.attackRateMs}
+          A: DMG {fmtStat(parentAUnit.stats.damage)} | HP {fmtStat(parentAUnit.stats.hp)} | Rate {fmtStat(parentAUnit.stats.attackRateMs)}
           <br />
-          B: DMG {parentBUnit.stats.damage} | HP {parentBUnit.stats.hp} | Rate {parentBUnit.stats.attackRateMs}
+          B: DMG {fmtStat(parentBUnit.stats.damage)} | HP {fmtStat(parentBUnit.stats.hp)} | Rate {fmtStat(parentBUnit.stats.attackRateMs)}
         </div>
       )}
 
+      {/* Speed controls */}
+      <div style={{ marginBottom: 8, display: "flex", gap: 4, alignItems: "center" }}>
+        <span style={{ fontSize: 12, color: "#888", marginRight: 4 }}>Speed:</span>
+        {[1, 2, 5, 10, 50].map((s) => (
+          <button
+            key={s}
+            onClick={() => setBreedSpeed(s)}
+            style={{
+              padding: "2px 8px",
+              fontSize: 12,
+              background: breedSpeed === s ? "#446" : "#333",
+              border: breedSpeed === s ? "1px solid #88f" : "1px solid #555",
+            }}
+          >
+            {s}x
+          </button>
+        ))}
+      </div>
+
+      {/* Variation control */}
+      <div style={{ marginBottom: 8, display: "flex", gap: 4, alignItems: "center" }}>
+        <label style={{ fontSize: 12, color: "#888" }}>
+          Variation: ±
+          <input
+            type="number"
+            value={variationPct}
+            min={0}
+            max={100}
+            step={0.1}
+            onChange={(e) => setVariationPct(Math.max(0, Math.min(100, Number(e.target.value))))}
+            style={{ width: 55, marginLeft: 4, fontSize: 12 }}
+          />
+          %
+        </label>
+      </div>
+
       {breeding && (
         <div style={{ marginBottom: 8 }}>
-          <p style={{ fontSize: 13 }}>Breeding in progress...</p>
+          <p style={{ fontSize: 13 }}>Breeding in progress... ({Math.round(breeding.durationMs / 1000)}s)</p>
           <div style={{ background: "#333", height: 20, width: "100%", borderRadius: 4 }}>
             <div
               style={{
@@ -264,7 +304,7 @@ export function BreedingPanel({ roster, rentals, breeding, dispatch, rng, exclud
           disabled={!canStart}
           style={{ marginBottom: 8 }}
         >
-          Start Breeding (30s)
+          Start Breeding ({Math.round(BREEDING_DURATION_MS / breedSpeed / 1000)}s)
         </button>
       )}
 

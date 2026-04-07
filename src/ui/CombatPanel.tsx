@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import type { Unit } from "../engine/units";
+import { fmtStat, type Unit } from "../engine/units";
 import type { Rental } from "../engine/rentals";
 import { ENEMY_LADDER, enemyToCombatant } from "../engine/enemies";
 import type { EnemyDefinition } from "../engine/enemies";
@@ -119,7 +119,7 @@ function FighterCard({
         max={c.maxHp}
         color={c.hp / c.maxHp > 0.5 ? "#2d8" : c.hp / c.maxHp > 0.2 ? "#da0" : "#e33"}
         height={22}
-        label={`${c.hp} / ${c.maxHp}`}
+        label={`${fmtStat(c.hp)} / ${fmtStat(c.maxHp)}`}
       />
       <div style={{ marginTop: 8, marginBottom: 4, fontSize: 11, color: "#888" }}>
         Cooldown
@@ -297,7 +297,7 @@ export function CombatPanel({ roster, rentals, money, dispatch, excludeUnitIds, 
             {allUnits.map((u) => (
               <option key={u.id} value={u.id}>
                 {rentals[u.id] ? "[R] " : ""}
-                {u.name || u.id.slice(0, 16)} (DMG:{u.stats.damage} HP:{u.stats.hp})
+                {u.name || u.id.slice(0, 16)} (DMG:{fmtStat(u.stats.damage)} HP:{fmtStat(u.stats.hp)})
               </option>
             ))}
           </select>
@@ -309,7 +309,7 @@ export function CombatPanel({ roster, rentals, money, dispatch, excludeUnitIds, 
           <select value={enemyIdx} onChange={(e) => setEnemyIdx(Number(e.target.value))}>
             {ENEMY_LADDER.map((e, i) => (
               <option key={e.id} value={i}>
-                {e.name} (DMG:{e.stats.damage} HP:{e.stats.hp} Rate:{e.stats.attackRateMs}ms)
+                {e.name} (DMG:{fmtStat(e.stats.damage)} HP:{fmtStat(e.stats.hp)} Rate:{fmtStat(e.stats.attackRateMs)}ms)
               </option>
             ))}
           </select>
