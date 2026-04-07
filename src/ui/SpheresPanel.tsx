@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { Sphere } from "../engine/units";
 import type { GameAction } from "../engine/state";
 import type { RNG } from "../engine/rng";
-import { prospect, spawnCarrier, mergeSpheres } from "../engine/spheres";
+import { prospect, spawnCarrier, mergeSpheres, rarityWeights, prospectResultCount } from "../engine/spheres";
 import { getMutation } from "../engine/mutations";
 import { Tooltip } from "./Tooltip";
 
@@ -92,6 +92,9 @@ export function SpheresPanel({ spheres, money, dispatch, rng }: Props) {
         </button>
       </div>
 
+      {/* Rarity chances */}
+      <RarityChances budget={budget} />
+
       {/* Sphere Collection */}
       <h2>Sphere Collection ({sphereList.length})</h2>
 
@@ -158,4 +161,39 @@ function rarityColor(rarity: string): string {
     case "rare": return "#48f";
     default: return "#aaa";
   }
+}
+
+function pct(v: number): string {
+  return (v * 100).toFixed(1) + "%";
+}
+
+function RarityChances({ budget }: { budget: number }) {
+  const w = rarityWeights(budget);
+  const count = prospectResultCount(budget);
+
+  return (
+    <div style={{ marginBottom: 10, padding: 8, background: "#1a1a2e", borderRadius: 6, border: "1px solid #333", fontSize: 12 }}>
+      <div style={{ marginBottom: 4, color: "#888" }}>Expected Spheres: <strong style={{ color: "#eee" }}>{count}</strong></div>
+      <div style={{ display: "flex", gap: 12 }}>
+        <span>
+          <span style={{ color: rarityColor("common") }}>Common</span>{" "}
+          {pct(w.common)}
+        </span>
+        <span>
+          <span style={{ color: rarityColor("rare") }}>Rare</span>{" "}
+          {pct(w.rare)}
+        </span>
+        <span>
+          <span style={{ color: rarityColor("legendary") }}>Legendary</span>{" "}
+          {pct(w.legendary)}
+        </span>
+      </div>
+      {/* Visual bar */}
+      <div style={{ display: "flex", height: 6, borderRadius: 3, overflow: "hidden", marginTop: 6 }}>
+        <div style={{ width: `${w.common * 100}%`, background: "#aaa" }} />
+        <div style={{ width: `${w.rare * 100}%`, background: "#48f" }} />
+        <div style={{ width: `${w.legendary * 100}%`, background: "#fa0" }} />
+      </div>
+    </div>
+  );
 }

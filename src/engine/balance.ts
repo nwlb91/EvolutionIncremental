@@ -58,13 +58,13 @@ export const PROSPECT_RESULT_COUNT_MAX = 10;
 // Carrier spawns at the bottom of the tier's value range (deterministic).
 
 // Enemy ladder
-export const ENEMY_COUNT = 10;
+export const ENEMY_COUNT = 20;
 export const ENEMY_BASE_DAMAGE = 1;
-export const ENEMY_DAMAGE_SCALING = 1; // 1..10 across 10 tiers
+export const ENEMY_DAMAGE_SCALING = 1; // +1 per tier
 export const ENEMY_BASE_HP = 10;
-export const ENEMY_HP_SCALING = 10; // 10..100 across 10 tiers
+export const ENEMY_HP_SCALING = 10; // +10 per tier
 export const ENEMY_BASE_ATTACK_RATE_MS = 2000;
-export const ENEMY_ATTACK_RATE_DECAY = 200; // 2000..200 across 10 tiers
+export const ENEMY_ATTACK_RATE_DECAY = 100; // 2000..100 across 20 tiers (floored at 200)
 
 // Combat playback (UI-side, but balance-tunable)
 export const COMBAT_PLAYBACK_SPEED = 1; // 1 = real-time, 2 = 2x speed, etc.
