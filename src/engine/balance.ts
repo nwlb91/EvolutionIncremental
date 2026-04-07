@@ -36,5 +36,8 @@ export const ENEMY_HP_SCALING = 40;
 export const ENEMY_BASE_ATTACK_RATE_MS = 1200;
 export const ENEMY_ATTACK_RATE_DECAY = 50; // gets faster per tier (lower = faster)
 
+// Combat playback (UI-side, but balance-tunable)
+export const COMBAT_PLAYBACK_SPEED = 1; // 1 = real-time, 2 = 2x speed, etc.
+
 // Persistence
 export const AUTOSAVE_INTERVAL_MS = 5_000;
