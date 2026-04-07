@@ -23,7 +23,6 @@ export function RosterView({ roster, dispatch, selectedId, onSelect }: Props) {
             <th>DMG</th>
             <th>HP</th>
             <th>Rate (ms)</th>
-            <th>Parents</th>
             <th></th>
           </tr>
         </thead>
@@ -59,7 +58,6 @@ export function RosterView({ roster, dispatch, selectedId, onSelect }: Props) {
               <td>{u.stats.damage}</td>
               <td>{u.stats.hp}</td>
               <td>{u.stats.attackRateMs}</td>
-              <td>{u.parentIds.length > 0 ? u.parentIds.length + " parents" : "starter"}</td>
               <td>
                 <button
                   onClick={(e) => {
