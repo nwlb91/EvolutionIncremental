@@ -4,6 +4,7 @@ import type { GameAction } from "../engine/state";
 import type { RNG } from "../engine/rng";
 import { prospect, spawnCarrier, mergeSpheres } from "../engine/spheres";
 import { getMutation } from "../engine/mutations";
+import { Tooltip } from "./Tooltip";
 
 interface Props {
   spheres: Record<string, Sphere>;
@@ -101,7 +102,10 @@ export function SpheresPanel({ spheres, money, dispatch, rng }: Props) {
         return (
           <div key={mutId} style={{ marginBottom: 10, padding: 8, background: "#1a1a2e", borderRadius: 6, border: "1px solid #333" }}>
             <div style={{ fontWeight: "bold", fontSize: 13, marginBottom: 4, color: rarityColor(def.rarity) }}>
-              {def.name} <span style={{ fontSize: 11, color: "#888" }}>({def.rarity})</span>
+              <Tooltip text={def.description}>
+                <span style={{ borderBottom: "1px dotted #555" }}>{def.name}</span>
+              </Tooltip>{" "}
+              <span style={{ fontSize: 11, color: "#888" }}>({def.rarity})</span>
             </div>
             {list
               .sort((a, b) => b.tier - a.tier)

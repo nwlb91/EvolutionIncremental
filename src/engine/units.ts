@@ -23,6 +23,7 @@ export type MutationRarity = "common" | "rare" | "legendary";
 export interface MutationDefinition {
   id: string;
   name: string;
+  description: string;
   rarity: MutationRarity;
   /** Base value range [min, max] at tier 1 (e.g. [0.001, 0.01] for 0.1%–1%). */
   baseRange: [number, number];

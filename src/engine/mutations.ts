@@ -32,17 +32,17 @@ export function mutationsByRarity(rarity: MutationRarity): MutationDefinition[] 
 // Effects are not implemented yet — only the registry structure matters.
 
 // Common pool
-register({ id: "thick_hide",   name: "Thick Hide",   rarity: "common",    baseRange: [0.001, 0.01] });
-register({ id: "quick_twitch", name: "Quick Twitch", rarity: "common",    baseRange: [0.001, 0.01] });
-register({ id: "iron_jaw",     name: "Iron Jaw",     rarity: "common",    baseRange: [0.001, 0.01] });
-register({ id: "sharp_claws",  name: "Sharp Claws",  rarity: "common",    baseRange: [0.001, 0.01] });
-register({ id: "endurance",    name: "Endurance",    rarity: "common",    baseRange: [0.001, 0.01] });
+register({ id: "thick_hide",   name: "Thick Hide",   description: "Toughened skin reduces incoming damage by a percentage.",                    rarity: "common", baseRange: [0.001, 0.01] });
+register({ id: "quick_twitch", name: "Quick Twitch", description: "Faster muscle reflexes reduce attack cooldown by a percentage.",             rarity: "common", baseRange: [0.001, 0.01] });
+register({ id: "iron_jaw",     name: "Iron Jaw",     description: "A reinforced jaw increases maximum HP by a percentage.",                     rarity: "common", baseRange: [0.001, 0.01] });
+register({ id: "sharp_claws",  name: "Sharp Claws",  description: "Razor-sharp claws increase base damage by a percentage.",                    rarity: "common", baseRange: [0.001, 0.01] });
+register({ id: "endurance",    name: "Endurance",    description: "Superior stamina grants a percentage boost to both HP and damage.",           rarity: "common", baseRange: [0.001, 0.01] });
 
 // Rare pool
-register({ id: "regeneration", name: "Regeneration", rarity: "rare",      baseRange: [0.001, 0.01] });
-register({ id: "berserk",      name: "Berserk",      rarity: "rare",      baseRange: [0.001, 0.01] });
-register({ id: "fortify",      name: "Fortify",      rarity: "rare",      baseRange: [0.001, 0.01] });
+register({ id: "regeneration", name: "Regeneration", description: "Passive healing restores a percentage of max HP each combat tick.",           rarity: "rare", baseRange: [0.001, 0.01] });
+register({ id: "berserk",      name: "Berserk",      description: "Damage increases by a percentage as HP drops below half.",                   rarity: "rare", baseRange: [0.001, 0.01] });
+register({ id: "fortify",      name: "Fortify",      description: "Each hit taken reduces subsequent damage by a stacking percentage.",          rarity: "rare", baseRange: [0.001, 0.01] });
 
 // Legendary pool
-register({ id: "apex_predator", name: "Apex Predator", rarity: "legendary", baseRange: [0.001, 0.01], maxTier: 5 });
-register({ id: "phoenix_blood", name: "Phoenix Blood", rarity: "legendary", baseRange: [0.001, 0.01], maxTier: 5 });
+register({ id: "apex_predator", name: "Apex Predator", description: "All stats gain a percentage bonus. The ultimate generalist mutation.", rarity: "legendary", baseRange: [0.001, 0.01], maxTier: 5 });
+register({ id: "phoenix_blood", name: "Phoenix Blood", description: "On defeat, revive once with a percentage of max HP restored.",        rarity: "legendary", baseRange: [0.001, 0.01], maxTier: 5 });

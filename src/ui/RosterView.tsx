@@ -2,6 +2,7 @@ import { fmtDmg, fmtHp, fmtRate, type Unit } from "../engine/units";
 import type { GameAction } from "../engine/state";
 import { getMutation } from "../engine/mutations";
 import { tierValueRange } from "../engine/spheres";
+import { Tooltip } from "./Tooltip";
 
 interface Props {
   roster: Record<string, Unit>;
@@ -123,7 +124,9 @@ function UnitDetail({ unit }: { unit: Unit }) {
               key={m.mutationId}
               style={{ marginTop: 4, padding: "4px 6px", background: "#111", borderRadius: 4 }}
             >
-              <span style={{ color: rarityColor(def.rarity) }}>{def.name}</span>
+              <Tooltip text={def.description}>
+                <span style={{ color: rarityColor(def.rarity), borderBottom: "1px dotted #555" }}>{def.name}</span>
+              </Tooltip>
               <span style={{ color: "#888", marginLeft: 6 }}>
                 T{m.tier}
               </span>

@@ -1,5 +1,6 @@
 import { allMutations } from "../engine/mutations";
 import type { MutationRarity } from "../engine/units";
+import { Tooltip } from "./Tooltip";
 
 function rarityColor(rarity: MutationRarity): string {
   switch (rarity) {
@@ -37,7 +38,11 @@ export function MutationGlossary() {
             <tbody>
               {grouped[rarity].map((m) => (
                 <tr key={m.id} style={{ borderTop: "1px solid #222" }}>
-                  <td style={{ padding: "3px 6px" }}>{m.name}</td>
+                  <td style={{ padding: "3px 6px" }}>
+                    <Tooltip text={m.description}>
+                      <span style={{ borderBottom: "1px dotted #555" }}>{m.name}</span>
+                    </Tooltip>
+                  </td>
                   <td style={{ padding: "3px 6px", color: "#888" }}>
                     {pct(m.baseRange[0])} – {pct(m.baseRange[1])}
                   </td>
