@@ -4,6 +4,7 @@ import { MoneyDisplay } from "./ui/MoneyDisplay";
 import { RosterView } from "./ui/RosterView";
 import { BreedingPanel } from "./ui/BreedingPanel";
 import { CombatPanel } from "./ui/CombatPanel";
+import { SpheresPanel } from "./ui/SpheresPanel";
 import { LocalStorageSaveAdapter } from "./persistence/adapter";
 
 export default function App() {
@@ -59,6 +60,9 @@ export default function App() {
             excludeUnitIds={battlingUnitId ? new Set([battlingUnitId]) : new Set()}
             onBreedingUnitsChange={onBreedingUnitsChange}
           />
+        </div>
+        <div>
+          <SpheresPanel spheres={state.spheres} money={state.money} dispatch={dispatch} rng={rng} />
         </div>
       </div>
 
