@@ -24,6 +24,7 @@ export function RosterView({ roster, dispatch, selectedId, onSelect }: Props) {
             <th>HP</th>
             <th>Rate (ms)</th>
             <th>Parents</th>
+            <th></th>
           </tr>
         </thead>
         <tbody>
@@ -59,6 +60,18 @@ export function RosterView({ roster, dispatch, selectedId, onSelect }: Props) {
               <td>{u.stats.hp}</td>
               <td>{u.stats.attackRateMs}</td>
               <td>{u.parentIds.length > 0 ? u.parentIds.length + " parents" : "starter"}</td>
+              <td>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    dispatch({ type: "REMOVE_UNIT", unitId: u.id });
+                    if (selectedId === u.id) onSelect("");
+                  }}
+                  style={{ color: "#f44", fontSize: 11, padding: "2px 6px" }}
+                >
+                  Dismiss
+                </button>
+              </td>
             </tr>
           ))}
         </tbody>
