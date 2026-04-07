@@ -1,73 +1,52 @@
-# React + TypeScript + Vite
+# Evolution Incremental
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+An incremental web game about breeding combat units.
 
-Currently, two official plugins are available:
+## Architecture
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```
+src/
+  engine/        # Pure TypeScript game logic — no React, no DOM, no browser APIs
+  persistence/   # Save/load behind a swappable SaveAdapter interface
+  ui/            # React components — imports engine/, never the reverse
+  App.tsx        # Root component wiring UI to engine
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+### Why this structure?
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+**Portability.** The `engine/` folder is a standalone TypeScript library with zero browser dependencies. It can run in Node, Deno, a web worker, or be compiled to another target. All game logic lives here so porting to a new renderer (Canvas, Unity via WASM, terminal) means rewriting `ui/` only.
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+**Testability.** Every engine module is unit-testable with Vitest in Node. No jsdom, no browser shims. The engine uses a seedable RNG (`engine/rng.ts`) so tests are deterministic.
+
+**Separation of concerns.** React handles display and user input. The engine handles rules, combat resolution, breeding, and economy. The persistence layer is behind an interface (`SaveAdapter`) so localStorage can be swapped for IndexedDB, cloud sync, or a file system.
+
+### Key design decisions
+
+- **All randomness** flows through `engine/rng.ts` (mulberry32 PRNG). `Math.random()` is never called outside that file.
+- **All balance constants** live in `engine/balance.ts` — one file to tune the entire game.
+- **Combat** is tick-based with a fixed timestep (50ms), decoupled from render frame rate. The resolver returns a full tick log that the UI can replay or skip.
+- **Combatant interface** is separate from Unit, so squad combat can be added without rewriting the resolver.
+- **State management** uses a plain reducer (`engine/state.ts`) — framework-agnostic, could be driven by Redux, Zustand, or a game loop.
+
+## Development
+
+```bash
+npm install
+npm run dev      # Start dev server
+npm test         # Run engine tests
+npm run build    # Production build
 ```
+
+## Deployment
+
+Configured for Netlify. Push to deploy, or:
+
+```bash
+npx netlify deploy --prod
+```
+
+## Tech stack
+
+- Vite + TypeScript + React
+- Vitest for testing
+- No external game libraries — intentionally minimal for portability
