@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useCallback } from "react";
 import { useGame } from "./ui/useGame";
 import { MoneyDisplay } from "./ui/MoneyDisplay";
 import { RosterView } from "./ui/RosterView";
@@ -11,6 +11,18 @@ export default function App() {
   const adapter = useMemo(() => new LocalStorageSaveAdapter(), []);
   const game = useGame(adapter);
   const [selectedUnit, setSelectedUnit] = useState<string | null>(null);
+
+  // Track which units are busy in each activity
+  const [breedingUnitIds, setBreedingUnitIds] = useState<Set<string>>(new Set());
+  const [battlingUnitId, setBattlingUnitId] = useState<string | null>(null);
+
+  const onBreedingUnitsChange = useCallback((ids: Set<string>) => {
+    setBreedingUnitIds(ids);
+  }, []);
+
+  const onBattlingUnitChange = useCallback((id: string | null) => {
+    setBattlingUnitId(id);
+  }, []);
 
   if (!game) return <p>Loading...</p>;
 
@@ -31,7 +43,14 @@ export default function App() {
           />
         </div>
         <div>
-          <CombatPanel roster={state.roster} rentals={state.rentals} money={state.money} dispatch={dispatch} />
+          <CombatPanel
+            roster={state.roster}
+            rentals={state.rentals}
+            money={state.money}
+            dispatch={dispatch}
+            excludeUnitIds={breedingUnitIds}
+            onBattlingUnitChange={onBattlingUnitChange}
+          />
         </div>
         <div>
           <BreedingPanel
@@ -40,6 +59,8 @@ export default function App() {
             breeding={state.breeding}
             dispatch={dispatch}
             rng={rng}
+            excludeUnitIds={battlingUnitId ? new Set([battlingUnitId]) : new Set()}
+            onBreedingUnitsChange={onBreedingUnitsChange}
           />
         </div>
         <div>

@@ -15,6 +15,8 @@ interface Props {
   rentals: Record<string, Rental>;
   money: number;
   dispatch: (a: GameAction) => void;
+  excludeUnitIds: Set<string>;
+  onBattlingUnitChange: (id: string | null) => void;
 }
 
 // ── Sub-components ──
@@ -144,7 +146,7 @@ function FighterCard({
 
 // ── Main component ──
 
-export function CombatPanel({ roster, rentals, money, dispatch }: Props) {
+export function CombatPanel({ roster, rentals, money, dispatch, excludeUnitIds, onBattlingUnitChange }: Props) {
   const [unitId, setUnitId] = useState("");
   const [enemyIdx, setEnemyIdx] = useState(0);
   const [phase, setPhase] = useState<Phase>("setup");
@@ -152,21 +154,22 @@ export function CombatPanel({ roster, rentals, money, dispatch }: Props) {
   const [currentTickIdx, setCurrentTickIdx] = useState(0);
   const [lastReward, setLastReward] = useState(0);
   const [speed, setSpeed] = useState(COMBAT_PLAYBACK_SPEED);
+  const [autoBattle, setAutoBattle] = useState(false);
+  const [totalWinnings, setTotalWinnings] = useState(0);
+  const [battleCount, setBattleCount] = useState(0);
 
-  // Names for display
   const [leftName, setLeftName] = useState("");
   const [rightName, setRightName] = useState("");
-
-  // Attack rate for cooldown bar scaling
   const [leftRate, setLeftRate] = useState(1000);
   const [rightRate, setRightRate] = useState(1000);
 
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const autoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const allUnits: Unit[] = [
     ...Object.values(roster),
     ...Object.values(rentals).map((r) => r.unit),
-  ];
+  ].filter((u) => !excludeUnitIds.has(u.id));
 
   const cleanup = useCallback(() => {
     if (timerRef.current) {
@@ -175,9 +178,25 @@ export function CombatPanel({ roster, rentals, money, dispatch }: Props) {
     }
   }, []);
 
-  useEffect(() => cleanup, [cleanup]);
+  const cleanupAuto = useCallback(() => {
+    if (autoTimerRef.current) {
+      clearTimeout(autoTimerRef.current);
+      autoTimerRef.current = null;
+    }
+  }, []);
 
-  const handleFight = () => {
+  useEffect(() => () => { cleanup(); cleanupAuto(); }, [cleanup, cleanupAuto]);
+
+  // Report battling unit to parent
+  useEffect(() => {
+    if (phase === "playing") {
+      onBattlingUnitChange(unitId);
+    } else {
+      onBattlingUnitChange(null);
+    }
+  }, [phase, unitId, onBattlingUnitChange]);
+
+  const runFight = useCallback(() => {
     const unit = allUnits.find((u) => u.id === unitId);
     if (!unit) return;
 
@@ -202,17 +221,18 @@ export function CombatPanel({ roster, rentals, money, dispatch }: Props) {
     setRightRate(enemy.stats.attackRateMs);
     setPhase("playing");
 
-    // Apply rewards immediately (they display at the end)
     if (result.winnerIndex === 0) {
       const gross = battleReward(enemy);
       const reward = isRental ? netRentalWinnings(gross) : gross;
       setLastReward(reward);
+      setTotalWinnings((prev) => prev + reward);
       dispatch({ type: "ADD_MONEY", amount: reward });
       dispatch({ type: "UPDATE_HIGHEST_TIER", tier: enemy.tier });
     } else {
       setLastReward(0);
     }
-  };
+    setBattleCount((prev) => prev + 1);
+  }, [allUnits, unitId, rentals, money, dispatch, enemyIdx]);
 
   // Playback timer
   useEffect(() => {
@@ -235,10 +255,21 @@ export function CombatPanel({ roster, rentals, money, dispatch }: Props) {
     return cleanup;
   }, [phase, battleResult, speed, cleanup]);
 
+  // Auto-battle: when result phase is reached and auto is on, start next fight
+  useEffect(() => {
+    if (phase !== "result" || !autoBattle) return;
+    cleanupAuto();
+
+    autoTimerRef.current = setTimeout(() => {
+      runFight();
+    }, 300);
+
+    return cleanupAuto;
+  }, [phase, autoBattle, cleanupAuto, runFight]);
+
   const currentTick: CombatTick | null =
     battleResult && battleResult.log[currentTickIdx] ? battleResult.log[currentTickIdx] : null;
 
-  // Determine flash states: who attacked this tick?
   const leftFlash: "hit" | "attack" | null = currentTick?.attackerId
     ? currentTick.attackerId === currentTick.combatants[0].id
       ? "attack"
@@ -249,6 +280,9 @@ export function CombatPanel({ roster, rentals, money, dispatch }: Props) {
       ? "attack"
       : "hit"
     : null;
+
+  // Check if selected unit is excluded (busy breeding)
+  const unitBusy = !!unitId && excludeUnitIds.has(unitId);
 
   // ── Render ──
 
@@ -267,6 +301,7 @@ export function CombatPanel({ roster, rentals, money, dispatch }: Props) {
               </option>
             ))}
           </select>
+          {unitBusy && <span style={{ color: "#fa0", fontSize: 11, marginLeft: 4 }}>(breeding)</span>}
         </label>
         <br />
         <label>
@@ -281,9 +316,32 @@ export function CombatPanel({ roster, rentals, money, dispatch }: Props) {
         </label>
         <br />
         {rentals[unitId] && <p style={{ color: "#fa0" }}>Rental fee: ${rentalBattleFee()}</p>}
-        <button onClick={handleFight} disabled={!unitId} style={{ marginTop: 8 }}>
+        <button onClick={runFight} disabled={!unitId || unitBusy} style={{ marginTop: 8 }}>
           Fight!
         </button>
+
+        {/* Auto-battle controls */}
+        <div style={{ marginTop: 8, padding: 8, background: "#1a1a2e", borderRadius: 6, border: "1px solid #333" }}>
+          <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
+            <input
+              type="checkbox"
+              checked={autoBattle}
+              onChange={(e) => {
+                setAutoBattle(e.target.checked);
+                if (!e.target.checked) {
+                  setTotalWinnings(0);
+                  setBattleCount(0);
+                }
+              }}
+            />
+            <span style={{ fontSize: 13 }}>Auto-battle</span>
+          </label>
+          {autoBattle && (
+            <p style={{ fontSize: 11, color: "#888", marginTop: 4 }}>
+              Will auto-start next fight after each battle ends.
+            </p>
+          )}
+        </div>
       </div>
     );
   }
@@ -324,7 +382,28 @@ export function CombatPanel({ roster, rentals, money, dispatch }: Props) {
               Skip
             </button>
           )}
+          {autoBattle && (
+            <button
+              onClick={() => {
+                setAutoBattle(false);
+                cleanup();
+                cleanupAuto();
+                setPhase("setup");
+                setBattleResult(null);
+              }}
+              style={{ marginLeft: "auto", padding: "2px 8px", fontSize: 12, color: "#f44" }}
+            >
+              Stop Auto
+            </button>
+          )}
         </div>
+
+        {/* Auto-battle stats */}
+        {autoBattle && battleCount > 0 && (
+          <div style={{ fontSize: 11, color: "#888", marginBottom: 6 }}>
+            Battles: {battleCount} | Total earned: ${totalWinnings}
+          </div>
+        )}
 
         {/* Arena */}
         <div style={{ display: "flex", gap: 12 }}>
@@ -372,8 +451,8 @@ export function CombatPanel({ roster, rentals, money, dispatch }: Props) {
           </div>
         </div>
 
-        {/* Result banner */}
-        {phase === "result" && (
+        {/* Result banner (only show if not auto-battling, since auto moves on quickly) */}
+        {phase === "result" && !autoBattle && (
           <div
             style={{
               marginTop: 12,
