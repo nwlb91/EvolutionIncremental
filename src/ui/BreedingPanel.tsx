@@ -38,6 +38,17 @@ function hasNewMutation(child: Unit, parentA: Unit, parentB: Unit): boolean {
   return child.mutations.some((m) => !parentMutIds.has(m.id));
 }
 
+/** Is the child at least as good as both parents on every stat in the set? */
+function isEquivalentOrBetter(child: UnitStats, a: UnitStats, b: UnitStats, stats: Set<keyof UnitStats>): boolean {
+  for (const s of stats) {
+    const bestParent = statIsBetter(s, a[s], b[s]) ? a[s] : b[s];
+    if (statIsBetter(s, bestParent, child[s]) && child[s] !== bestParent) {
+      return false; // child is strictly worse on this stat
+    }
+  }
+  return true;
+}
+
 function statLabel(stat: keyof UnitStats | "none"): string {
   switch (stat) {
     case "damage": return "DMG";
@@ -70,6 +81,8 @@ export function BreedingPanel({ roster, rentals, breeding, dispatch, rng, exclud
   const [autoDismiss, setAutoDismiss] = useState(false);
   const [keepIfStatImproved, setKeepIfStatImproved] = useState(true);
   const [keepIfNewMutation, setKeepIfNewMutation] = useState(true);
+  const [keepIfEquivalent, setKeepIfEquivalent] = useState(false);
+  const [equivalentStats, setEquivalentStats] = useState<Set<keyof UnitStats>>(new Set());
   const [noRegressionGuard, setNoRegressionGuard] = useState(false);
   const [guardedStats, setGuardedStats] = useState<Set<keyof UnitStats>>(new Set());
   const [lastChildInfo, setLastChildInfo] = useState<string | null>(null);
@@ -182,24 +195,25 @@ export function BreedingPanel({ roster, rentals, breeding, dispatch, rng, exclud
 
           // --- Auto-dismiss logic ---
           if (autoBreed && autoDismiss) {
-            const shouldKeep =
-              (keepIfStatImproved && hasAnyStatImprovement(child.stats, a.stats, b.stats)) ||
-              (keepIfNewMutation && hasNewMutation(child, a, b));
+            const reasons: string[] = [];
+            if (keepIfStatImproved && hasAnyStatImprovement(child.stats, a.stats, b.stats)) {
+              reasons.push("stat improvement");
+            }
+            if (keepIfNewMutation && hasNewMutation(child, a, b)) {
+              reasons.push("new mutation");
+            }
+            if (keepIfEquivalent && equivalentStats.size > 0 &&
+                isEquivalentOrBetter(child.stats, a.stats, b.stats, equivalentStats)) {
+              reasons.push("equivalent");
+            }
 
-            if (!shouldKeep) {
+            if (reasons.length === 0) {
               dispatch({ type: "REMOVE_UNIT", unitId: child.id });
               setLastChildInfo(
                 `Auto-dismissed (DMG:${fmtDmg(child.stats.damage)} HP:${fmtHp(child.stats.hp)} Rate:${fmtRate(child.stats.attackRateMs)})`,
               );
               return;
             } else {
-              const reasons: string[] = [];
-              if (keepIfStatImproved && hasAnyStatImprovement(child.stats, a.stats, b.stats)) {
-                reasons.push("stat improvement");
-              }
-              if (keepIfNewMutation && hasNewMutation(child, a, b)) {
-                reasons.push("new mutation");
-              }
               setLastChildInfo(
                 `Kept — ${reasons.join(", ")} (DMG:${fmtDmg(child.stats.damage)} HP:${fmtHp(child.stats.hp)} Rate:${fmtRate(child.stats.attackRateMs)})`,
               );
@@ -215,13 +229,22 @@ export function BreedingPanel({ roster, rentals, breeding, dispatch, rng, exclud
       }
     }, 200);
     return () => clearInterval(id);
-  }, [breeding, findUnit, rng, dispatch, autoBreed, keyStat, autoDismiss, keepIfStatImproved, keepIfNewMutation, variationPct, noRegressionGuard, guardedStats]);
+  }, [breeding, findUnit, rng, dispatch, autoBreed, keyStat, autoDismiss, keepIfStatImproved, keepIfNewMutation, keepIfEquivalent, equivalentStats, variationPct, noRegressionGuard, guardedStats]);
 
   const handleStart = () => {
     if (!parentA || !parentB || parentA === parentB) return;
     const op = startBreeding(parentA, parentB, Date.now());
     op.durationMs = Math.round(BREEDING_DURATION_MS / breedSpeed);
     dispatch({ type: "START_BREEDING", op });
+  };
+
+  const toggleEquivalentStat = (stat: keyof UnitStats) => {
+    setEquivalentStats((prev) => {
+      const next = new Set(prev);
+      if (next.has(stat)) next.delete(stat);
+      else next.add(stat);
+      return next;
+    });
   };
 
   const toggleGuardedStat = (stat: keyof UnitStats) => {
@@ -435,6 +458,35 @@ export function BreedingPanel({ roster, rentals, breeding, dispatch, rng, exclud
                   />
                   <span style={{ fontSize: 11, color: "#aaa" }}>Keep if offspring has a new mutation</span>
                 </label>
+                <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
+                  <input
+                    type="checkbox"
+                    checked={keepIfEquivalent}
+                    onChange={(e) => setKeepIfEquivalent(e.target.checked)}
+                  />
+                  <span style={{ fontSize: 11, color: "#aaa" }}>Keep if not inferior on selected stats</span>
+                </label>
+                {keepIfEquivalent && (
+                  <div style={{ marginLeft: 20, display: "flex", flexDirection: "column", gap: 3 }}>
+                    {ALL_STATS.map((s) => (
+                      <label key={s} style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
+                        <input
+                          type="checkbox"
+                          checked={equivalentStats.has(s)}
+                          onChange={() => toggleEquivalentStat(s)}
+                        />
+                        <span style={{ fontSize: 11, color: "#aaa" }}>
+                          {statLabel(s)}
+                          {parentAUnit && parentBUnit && (
+                            <span style={{ color: "#666", marginLeft: 4 }}>
+                              (best: {fmtStatByKey(s, statIsBetter(s, parentAUnit.stats[s], parentBUnit.stats[s]) ? parentAUnit.stats[s] : parentBUnit.stats[s])})
+                            </span>
+                          )}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>
