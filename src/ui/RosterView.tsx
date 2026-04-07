@@ -1,5 +1,7 @@
 import { fmtDmg, fmtHp, fmtRate, type Unit } from "../engine/units";
 import type { GameAction } from "../engine/state";
+import { getMutation } from "../engine/mutations";
+import { tierValueRange } from "../engine/spheres";
 
 interface Props {
   roster: Record<string, Unit>;
@@ -10,6 +12,7 @@ interface Props {
 
 export function RosterView({ roster, dispatch, selectedId, onSelect }: Props) {
   const units = Object.values(roster);
+  const selected = selectedId ? roster[selectedId] ?? null : null;
 
   return (
     <div>
@@ -74,6 +77,72 @@ export function RosterView({ roster, dispatch, selectedId, onSelect }: Props) {
           ))}
         </tbody>
       </table>
+
+      {selected && (
+        <UnitDetail unit={selected} />
+      )}
+    </div>
+  );
+}
+
+function pct(v: number): string {
+  return (v * 100).toFixed(2) + "%";
+}
+
+function rarityColor(rarity: string): string {
+  switch (rarity) {
+    case "legendary": return "#fa0";
+    case "rare": return "#48f";
+    default: return "#aaa";
+  }
+}
+
+function UnitDetail({ unit }: { unit: Unit }) {
+  return (
+    <div style={{ marginTop: 12, padding: 10, background: "#1a1a2e", borderRadius: 6, border: "1px solid #333" }}>
+      <h3 style={{ margin: "0 0 8px", fontSize: 14 }}>
+        {unit.name || unit.id.slice(0, 16)}
+      </h3>
+
+      <div style={{ fontSize: 12, marginBottom: 8 }}>
+        <div>Damage: <strong>{fmtDmg(unit.stats.damage)}</strong></div>
+        <div>HP: <strong>{fmtHp(unit.stats.hp)}</strong></div>
+        <div>Attack Rate: <strong>{fmtRate(unit.stats.attackRateMs)}ms</strong></div>
+      </div>
+
+      <div style={{ fontSize: 12 }}>
+        <strong>Mutations ({unit.mutations.length})</strong>
+        {unit.mutations.length === 0 && (
+          <p style={{ color: "#666", margin: "4px 0 0" }}>None</p>
+        )}
+        {unit.mutations.map((m) => {
+          const def = getMutation(m.mutationId);
+          const [minVal, maxVal] = tierValueRange(def.baseRange, m.tier);
+          return (
+            <div
+              key={m.mutationId}
+              style={{ marginTop: 4, padding: "4px 6px", background: "#111", borderRadius: 4 }}
+            >
+              <span style={{ color: rarityColor(def.rarity) }}>{def.name}</span>
+              <span style={{ color: "#888", marginLeft: 6 }}>
+                T{m.tier}
+              </span>
+              <span style={{ color: "#aaa", marginLeft: 6 }}>
+                Value: {pct(m.value)}
+              </span>
+              <span style={{ color: "#555", marginLeft: 6, fontSize: 11 }}>
+                (range: {pct(minVal)} – {pct(maxVal)})
+              </span>
+            </div>
+          );
+        })}
+      </div>
+
+      {unit.parentIds.length > 0 && (
+        <div style={{ fontSize: 11, color: "#555", marginTop: 8 }}>
+          Parents: {unit.parentIds.map((id) => id.slice(0, 12)).join(", ")}
+        </div>
+      )}
     </div>
   );
 }
