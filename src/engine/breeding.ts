@@ -31,8 +31,10 @@ export interface BreedingResult {
 export function breedStats(a: UnitStats, b: UnitStats, rng: RNG): UnitStats {
   const pick = (statA: number, statB: number, min: number, max: number): number => {
     const base = rng.next() < 0.5 ? statA : statB;
-    const variation = 1 + (rng.next() * 2 - 1) * BREEDING_VARIATION_FACTOR;
-    return Math.round(Math.min(max, Math.max(min, base * variation)));
+    const pctDelta = (rng.next() * 2 - 1) * BREEDING_VARIATION_FACTOR * base;
+    // Guarantee at least ±1 is possible so rounding can't kill variation
+    const delta = pctDelta >= 0 ? Math.max(pctDelta, rng.next()) : Math.min(pctDelta, -rng.next());
+    return Math.round(Math.min(max, Math.max(min, base + delta)));
   };
 
   return {

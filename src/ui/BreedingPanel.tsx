@@ -14,6 +14,24 @@ function statIsBetter(stat: keyof UnitStats, a: number, b: number): boolean {
   return a > b;
 }
 
+/** Does the child beat either parent on at least one stat? */
+function hasAnyStatImprovement(child: UnitStats, a: UnitStats, b: UnitStats): boolean {
+  const stats: (keyof UnitStats)[] = ["damage", "hp", "attackRateMs"];
+  return stats.some((s) => {
+    const bestParent = statIsBetter(s, a[s], b[s]) ? a[s] : b[s];
+    return statIsBetter(s, child[s], bestParent);
+  });
+}
+
+/** Does the child have any mutation that neither parent has? */
+function hasNewMutation(child: Unit, parentA: Unit, parentB: Unit): boolean {
+  const parentMutIds = new Set([
+    ...parentA.mutations.map((m) => m.id),
+    ...parentB.mutations.map((m) => m.id),
+  ]);
+  return child.mutations.some((m) => !parentMutIds.has(m.id));
+}
+
 function statLabel(stat: KeyStat): string {
   switch (stat) {
     case "damage": return "DMG";
@@ -39,6 +57,9 @@ export function BreedingPanel({ roster, rentals, breeding, dispatch, rng, exclud
   const [progress, setProgress] = useState(0);
   const [autoBreed, setAutoBreed] = useState(false);
   const [keyStat, setKeyStat] = useState<KeyStat>("none");
+  const [autoDismiss, setAutoDismiss] = useState(false);
+  const [keepIfStatImproved, setKeepIfStatImproved] = useState(true);
+  const [keepIfNewMutation, setKeepIfNewMutation] = useState(true);
   const [lastChildInfo, setLastChildInfo] = useState<string | null>(null);
 
   const pendingAutoStart = useRef(false);
@@ -58,10 +79,6 @@ export function BreedingPanel({ roster, rentals, breeding, dispatch, rng, exclud
   useEffect(() => {
     if (breeding) {
       onBreedingUnitsChange(new Set([breeding.parentA, breeding.parentB]));
-    } else if (parentA || parentB) {
-      // Also lock units that are selected for breeding (even if not started yet)
-      // Only lock during active breeding to avoid over-constraining
-      onBreedingUnitsChange(new Set());
     } else {
       onBreedingUnitsChange(new Set());
     }
@@ -104,6 +121,7 @@ export function BreedingPanel({ roster, rentals, breeding, dispatch, rng, exclud
           dispatch({ type: "COMPLETE_BREEDING", child });
           dispatch({ type: "UPDATE_RNG_STATE", state: rng.state() });
 
+          // --- Auto-replace logic (key stat) ---
           if (autoBreed && keyStat !== "none") {
             const stat = keyStat;
             const childVal = child.stats[stat];
@@ -125,16 +143,39 @@ export function BreedingPanel({ roster, rentals, breeding, dispatch, rng, exclud
                 `Replaced ${worseParent.name || worseParent.id.slice(0, 12)} ` +
                 `(${statLabel(stat)}: ${worseVal} → ${childVal})`,
               );
-            } else {
+              return;
+            }
+          }
+
+          // --- Auto-dismiss logic ---
+          if (autoBreed && autoDismiss) {
+            // Check exceptions before dismissing
+            const shouldKeep =
+              (keepIfStatImproved && hasAnyStatImprovement(child.stats, a.stats, b.stats)) ||
+              (keepIfNewMutation && hasNewMutation(child, a, b));
+
+            if (!shouldKeep) {
               dispatch({ type: "REMOVE_UNIT", unitId: child.id });
               setLastChildInfo(
-                `Dismissed offspring (${statLabel(stat)}: ${childVal}, ` +
-                `needed > ${worseVal})`,
+                `Auto-dismissed offspring (DMG:${child.stats.damage} HP:${child.stats.hp} Rate:${child.stats.attackRateMs})`,
               );
+              return;
+            } else {
+              const reasons: string[] = [];
+              if (keepIfStatImproved && hasAnyStatImprovement(child.stats, a.stats, b.stats)) {
+                reasons.push("stat improvement");
+              }
+              if (keepIfNewMutation && hasNewMutation(child, a, b)) {
+                reasons.push("new mutation");
+              }
+              setLastChildInfo(
+                `Kept offspring — ${reasons.join(", ")} (DMG:${child.stats.damage} HP:${child.stats.hp} Rate:${child.stats.attackRateMs})`,
+              );
+              return;
             }
-          } else {
-            setLastChildInfo(null);
           }
+
+          setLastChildInfo(null);
         } else {
           dispatch({ type: "CANCEL_BREEDING" });
           setLastChildInfo(null);
@@ -142,7 +183,7 @@ export function BreedingPanel({ roster, rentals, breeding, dispatch, rng, exclud
       }
     }, 200);
     return () => clearInterval(id);
-  }, [breeding, findUnit, rng, dispatch, autoBreed, keyStat]);
+  }, [breeding, findUnit, rng, dispatch, autoBreed, keyStat, autoDismiss, keepIfStatImproved, keepIfNewMutation]);
 
   const handleStart = () => {
     if (!parentA || !parentB || parentA === parentB) return;
@@ -153,7 +194,6 @@ export function BreedingPanel({ roster, rentals, breeding, dispatch, rng, exclud
   const parentAUnit = findUnit(parentA);
   const parentBUnit = findUnit(parentB);
 
-  // Check if selected parents are excluded (busy battling)
   const parentABusy = !!parentA && excludeUnitIds.has(parentA);
   const parentBBusy = !!parentB && excludeUnitIds.has(parentB);
   const canStart = !!parentA && !!parentB && parentA !== parentB && !parentABusy && !parentBBusy;
@@ -239,7 +279,7 @@ export function BreedingPanel({ roster, rentals, breeding, dispatch, rng, exclud
         </label>
 
         {autoBreed && (
-          <div style={{ marginTop: 6 }}>
+          <div style={{ marginTop: 6, display: "flex", flexDirection: "column", gap: 6 }}>
             <label style={{ fontSize: 12 }}>
               Key stat (auto-replace worse parent):{" "}
               <select
@@ -253,6 +293,36 @@ export function BreedingPanel({ roster, rentals, breeding, dispatch, rng, exclud
                 <option value="attackRateMs">Attack Rate (lower = better)</option>
               </select>
             </label>
+
+            <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
+              <input
+                type="checkbox"
+                checked={autoDismiss}
+                onChange={(e) => setAutoDismiss(e.target.checked)}
+              />
+              <span style={{ fontSize: 12 }}>Auto-dismiss inferior offspring</span>
+            </label>
+
+            {autoDismiss && (
+              <div style={{ marginLeft: 20, display: "flex", flexDirection: "column", gap: 4 }}>
+                <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
+                  <input
+                    type="checkbox"
+                    checked={keepIfStatImproved}
+                    onChange={(e) => setKeepIfStatImproved(e.target.checked)}
+                  />
+                  <span style={{ fontSize: 11, color: "#aaa" }}>Keep if any stat exceeds both parents</span>
+                </label>
+                <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
+                  <input
+                    type="checkbox"
+                    checked={keepIfNewMutation}
+                    onChange={(e) => setKeepIfNewMutation(e.target.checked)}
+                  />
+                  <span style={{ fontSize: 11, color: "#aaa" }}>Keep if offspring has a new mutation</span>
+                </label>
+              </div>
+            )}
           </div>
         )}
 
