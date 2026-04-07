@@ -13,13 +13,34 @@ import {
 
 // ── Core types ──
 
-/** Mutation slot — designed but no actual mutations yet. */
-export interface Mutation {
+/** Rarity pool for mutation registry entries. */
+export type MutationRarity = "common" | "rare" | "legendary";
+
+/**
+ * Registry entry for a mutation definition.
+ * Lives in engine/mutations.ts but the type is here to avoid circular deps.
+ */
+export interface MutationDefinition {
   id: string;
   name: string;
-  description: string;
-  /** Which stat(s) it modifies and how — TBD in a future version. */
-  effects: Record<string, number>;
+  rarity: MutationRarity;
+  /** Base value range [min, max] at tier 1 (e.g. [0.001, 0.01] for 0.1%–1%). */
+  baseRange: [number, number];
+  /** Optional cap on Sphere tier for this mutation. Default: unlimited. */
+  maxTier?: number;
+}
+
+/**
+ * A concrete mutation instance on a unit.
+ * One entry per mutation id — a unit cannot have the same mutation at multiple tiers.
+ */
+export interface MutationInstance {
+  /** References MutationDefinition.id */
+  mutationId: string;
+  /** Current tier (integer ≥ 1). */
+  tier: number;
+  /** Current value (within the tier's scaled range). */
+  value: number;
 }
 
 export interface UnitStats {
@@ -32,8 +53,21 @@ export interface Unit {
   id: string;
   name: string; // user-editable, defaults to ""
   stats: UnitStats;
-  mutations: Mutation[];
-  parentIds: string[]; // empty for starters / rentals without lineage
+  mutations: MutationInstance[];
+  parentIds: string[]; // empty for starters / carriers without lineage
+}
+
+/**
+ * A Sphere is a permanent, reusable collectible that references a mutation.
+ * Using a Sphere spawns a carrier unit with that mutation pre-applied.
+ */
+export interface Sphere {
+  /** Unique instance id. */
+  id: string;
+  /** References MutationDefinition.id */
+  mutationId: string;
+  /** Tier (integer ≥ 1). Two same-mutation same-tier Spheres can merge → tier+1. */
+  tier: number;
 }
 
 // ── Factories ──
@@ -91,7 +125,7 @@ export function createUnit(
   stats: UnitStats,
   parentIds: string[] = [],
   name = "",
-  mutations: Mutation[] = [],
+  mutations: MutationInstance[] = [],
 ): Unit {
   return { id, name, stats, mutations, parentIds };
 }

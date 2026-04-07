@@ -1,18 +1,25 @@
-import type { Unit } from "./units";
+import type { Unit, Sphere } from "./units";
 import type { BreedingOperation } from "./breeding";
-import type { Rental } from "./rentals";
+
+// ── Persistence versioning ──
+
+/** Bump this when the save shape changes. Old saves are discarded on mismatch. */
+export const SAVE_VERSION = 2;
 
 // ── Root game state ──
 
 export interface GameState {
+  /** Save format version — checked on load to discard incompatible saves. */
+  saveVersion: number;
+
   /** Player's money. */
   money: number;
 
   /** All player-owned units (keyed by unit ID for O(1) lookup). */
   roster: Record<string, Unit>;
 
-  /** Currently active rentals (keyed by unit ID). */
-  rentals: Record<string, Rental>;
+  /** Player's Sphere collection (keyed by Sphere id). */
+  spheres: Record<string, Sphere>;
 
   /** In-progress breeding operation, or null if idle. */
   breeding: BreedingOperation | null;
@@ -38,8 +45,9 @@ export type GameAction =
   | { type: "START_BREEDING"; op: BreedingOperation }
   | { type: "COMPLETE_BREEDING"; child: Unit }
   | { type: "CANCEL_BREEDING" }
-  | { type: "ADD_RENTAL"; rental: Rental }
-  | { type: "RELEASE_RENTAL"; unitId: string }
+  | { type: "ADD_SPHERES"; spheres: Sphere[] }
+  | { type: "REMOVE_SPHERE"; sphereId: string }
+  | { type: "MERGE_SPHERES"; sphereIdA: string; sphereIdB: string; result: Sphere }
   | { type: "UPDATE_RNG_STATE"; state: number }
   | { type: "UPDATE_HIGHEST_TIER"; tier: number }
   | { type: "SET_LAST_SAVED"; timestamp: number }
@@ -91,15 +99,20 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     case "CANCEL_BREEDING":
       return { ...state, breeding: null };
 
-    case "ADD_RENTAL":
-      return {
-        ...state,
-        rentals: { ...state.rentals, [action.rental.unit.id]: action.rental },
-      };
+    case "ADD_SPHERES": {
+      const added: Record<string, Sphere> = {};
+      for (const s of action.spheres) added[s.id] = s;
+      return { ...state, spheres: { ...state.spheres, ...added } };
+    }
 
-    case "RELEASE_RENTAL": {
-      const { [action.unitId]: _, ...rest } = state.rentals;
-      return { ...state, rentals: rest };
+    case "REMOVE_SPHERE": {
+      const { [action.sphereId]: _, ...rest } = state.spheres;
+      return { ...state, spheres: rest };
+    }
+
+    case "MERGE_SPHERES": {
+      const { [action.sphereIdA]: _a, [action.sphereIdB]: _b, ...remaining } = state.spheres;
+      return { ...state, spheres: { ...remaining, [action.result.id]: action.result } };
     }
 
     case "UPDATE_RNG_STATE":
@@ -126,9 +139,10 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
 
 export function createInitialState(rngSeed: number): GameState {
   return {
+    saveVersion: SAVE_VERSION,
     money: 0, // will be set by economy/STARTING_MONEY during game init
     roster: {},
-    rentals: {},
+    spheres: {},
     breeding: null,
     highestTierBeaten: -1,
     rngState: rngSeed,
