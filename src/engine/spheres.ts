@@ -138,3 +138,61 @@ export function mergeSpheres(a: Sphere, b: Sphere): Sphere | null {
     tier: nextTier,
   };
 }
+
+export interface MergeOperation {
+  sphereIdA: string;
+  sphereIdB: string;
+  result: Sphere;
+}
+
+/**
+ * Greedily merge all compatible Sphere pairs.
+ * Groups by mutation, then within each mutation sorts by tier and pairs
+ * adjacent same-tier Spheres. Repeats until no more merges are possible
+ * (so three T1s → one T2 + one leftover T1, then the T2 can't merge alone).
+ */
+export function mergeAllSpheres(spheres: Record<string, Sphere>): MergeOperation[] {
+  // Work on a mutable copy
+  const pool = new Map<string, Sphere>();
+  for (const s of Object.values(spheres)) pool.set(s.id, { ...s });
+
+  const ops: MergeOperation[] = [];
+  let merged = true;
+
+  while (merged) {
+    merged = false;
+
+    // Group by mutation
+    const byMutation = new Map<string, Sphere[]>();
+    for (const s of pool.values()) {
+      const list = byMutation.get(s.mutationId) ?? [];
+      list.push(s);
+      byMutation.set(s.mutationId, list);
+    }
+
+    for (const list of byMutation.values()) {
+      // Sort by tier ascending so we merge from the bottom up
+      list.sort((a, b) => a.tier - b.tier);
+
+      for (let i = 0; i < list.length - 1; i++) {
+        const a = list[i];
+        const b = list[i + 1];
+        if (a.tier !== b.tier) continue;
+
+        const result = mergeSpheres(a, b);
+        if (!result) continue;
+
+        ops.push({ sphereIdA: a.id, sphereIdB: b.id, result });
+        pool.delete(a.id);
+        pool.delete(b.id);
+        pool.set(result.id, result);
+        merged = true;
+        break; // restart grouping since pool changed
+      }
+
+      if (merged) break;
+    }
+  }
+
+  return ops;
+}

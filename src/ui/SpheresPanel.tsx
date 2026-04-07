@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { Sphere } from "../engine/units";
 import type { GameAction } from "../engine/state";
 import type { RNG } from "../engine/rng";
-import { prospect, spawnCarrier, mergeSpheres, rarityWeights, prospectResultCount } from "../engine/spheres";
+import { prospect, spawnCarrier, mergeSpheres, mergeAllSpheres, rarityWeights, prospectResultCount } from "../engine/spheres";
 import { getMutation } from "../engine/mutations";
 import { Tooltip } from "./Tooltip";
 
@@ -51,6 +51,14 @@ export function SpheresPanel({ spheres, money, dispatch, rng }: Props) {
     setSelectedIds(new Set());
   };
 
+  const handleMergeAll = () => {
+    const ops = mergeAllSpheres(spheres);
+    for (const op of ops) {
+      dispatch({ type: "MERGE_SPHERES", sphereIdA: op.sphereIdA, sphereIdB: op.sphereIdB, result: op.result });
+    }
+    setSelectedIds(new Set());
+  };
+
   // Group spheres by mutation
   const sphereList = Object.values(spheres);
   const grouped = new Map<string, Sphere[]>();
@@ -58,6 +66,14 @@ export function SpheresPanel({ spheres, money, dispatch, rng }: Props) {
     const list = grouped.get(s.mutationId) ?? [];
     list.push(s);
     grouped.set(s.mutationId, list);
+  }
+
+  // Count how many pairs could be merged (for enabling Merge All)
+  let mergeablePairs = 0;
+  for (const list of grouped.values()) {
+    const tierCounts = new Map<number, number>();
+    for (const s of list) tierCounts.set(s.tier, (tierCounts.get(s.tier) ?? 0) + 1);
+    for (const count of tierCounts.values()) mergeablePairs += Math.floor(count / 2);
   }
 
   // Check if merge is valid
@@ -146,11 +162,18 @@ export function SpheresPanel({ spheres, money, dispatch, rng }: Props) {
         );
       })}
 
-      {selectedArr.length === 2 && (
-        <button onClick={handleMerge} disabled={!canMerge} style={{ marginTop: 4 }}>
-          Merge Selected{canMerge ? ` → Tier ${spheres[selectedArr[0]].tier + 1}` : " (must be same mutation & tier)"}
-        </button>
-      )}
+      <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+        {selectedArr.length === 2 && (
+          <button onClick={handleMerge} disabled={!canMerge}>
+            Merge Selected{canMerge ? ` → Tier ${spheres[selectedArr[0]].tier + 1}` : " (must be same mutation & tier)"}
+          </button>
+        )}
+        {mergeablePairs > 0 && (
+          <button onClick={handleMergeAll}>
+            Merge All ({mergeablePairs} {mergeablePairs === 1 ? "pair" : "pairs"})
+          </button>
+        )}
+      </div>
     </div>
   );
 }
