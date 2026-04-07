@@ -68,9 +68,19 @@ export default function App() {
         </div>
       </div>
 
-      <div style={{ marginTop: 24, fontSize: 12, color: "#666" }}>
-        <button onClick={() => game.save()} style={{ marginRight: 8 }}>Save Now</button>
+      <div style={{ marginTop: 24, fontSize: 12, color: "#666", display: "flex", alignItems: "center", gap: 8 }}>
+        <button onClick={() => game.save()}>Save Now</button>
         {state.lastSaved > 0 && <span>Last saved: {new Date(state.lastSaved).toLocaleTimeString()}</span>}
+        <button
+          onClick={() => {
+            if (window.confirm("Reset all progress? This cannot be undone.")) {
+              game.resetGame();
+            }
+          }}
+          style={{ marginLeft: "auto", color: "#f44", border: "1px solid #f44" }}
+        >
+          Reset Save
+        </button>
       </div>
     </div>
   );

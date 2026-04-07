@@ -1,7 +1,16 @@
 import type { Unit, UnitStats } from "./units";
 import { generateUnitId } from "./units";
 import type { RNG } from "./rng";
-import { BREEDING_VARIATION_FACTOR, BREEDING_DURATION_MS } from "./balance";
+import {
+  BREEDING_VARIATION_FACTOR,
+  BREEDING_DURATION_MS,
+  STAT_MIN_DAMAGE,
+  STAT_MAX_DAMAGE,
+  STAT_MIN_HP,
+  STAT_MAX_HP,
+  STAT_MIN_ATTACK_RATE_MS,
+  STAT_MAX_ATTACK_RATE_MS,
+} from "./balance";
 
 export interface BreedingOperation {
   parentA: string; // unit id
@@ -20,16 +29,16 @@ export interface BreedingResult {
  * then multiplicative noise is applied.
  */
 export function breedStats(a: UnitStats, b: UnitStats, rng: RNG): UnitStats {
-  const pick = (statA: number, statB: number): number => {
+  const pick = (statA: number, statB: number, min: number, max: number): number => {
     const base = rng.next() < 0.5 ? statA : statB;
     const variation = 1 + (rng.next() * 2 - 1) * BREEDING_VARIATION_FACTOR;
-    return Math.max(1, Math.round(base * variation));
+    return Math.round(Math.min(max, Math.max(min, base * variation)));
   };
 
   return {
-    damage: pick(a.damage, b.damage),
-    hp: pick(a.hp, b.hp),
-    attackRateMs: pick(a.attackRateMs, b.attackRateMs),
+    damage: pick(a.damage, b.damage, STAT_MIN_DAMAGE, STAT_MAX_DAMAGE),
+    hp: pick(a.hp, b.hp, STAT_MIN_HP, STAT_MAX_HP),
+    attackRateMs: pick(a.attackRateMs, b.attackRateMs, STAT_MIN_ATTACK_RATE_MS, STAT_MAX_ATTACK_RATE_MS),
   };
 }
 

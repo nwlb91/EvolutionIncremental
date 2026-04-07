@@ -2,8 +2,16 @@
 
 // Breeding
 export const BREEDING_DURATION_MS = 30_000;
-export const BREEDING_VARIATION_FACTOR = 0.05; // ±5% multiplicative noise per stat
+export const BREEDING_VARIATION_FACTOR = 0.01; // ±1% multiplicative noise per stat
 export const MAX_CONCURRENT_BREEDS = 1;
+
+// Stat natural limits (hard caps for breeding)
+export const STAT_MIN_DAMAGE = 1;
+export const STAT_MAX_DAMAGE = 10;
+export const STAT_MIN_HP = 10;
+export const STAT_MAX_HP = 100;
+export const STAT_MIN_ATTACK_RATE_MS = 200; // fastest possible (lower = faster)
+export const STAT_MAX_ATTACK_RATE_MS = 2000; // slowest possible
 
 // Combat
 export const COMBAT_TICK_MS = 50; // fixed timestep for battle simulation
@@ -23,18 +31,18 @@ export const RENTAL_SEARCH_MIN_RESULTS = 1;
 export const RENTAL_SEARCH_MAX_RESULTS = 5;
 
 // Starting unit stats
-export const STARTER_DAMAGE = 10;
-export const STARTER_HP = 100;
-export const STARTER_ATTACK_RATE_MS = 1000; // 1 attack per second
+export const STARTER_DAMAGE = 1;
+export const STARTER_HP = 10;
+export const STARTER_ATTACK_RATE_MS = 2000;
 
 // Enemy ladder
 export const ENEMY_COUNT = 10;
-export const ENEMY_BASE_DAMAGE = 8;
-export const ENEMY_DAMAGE_SCALING = 4;
-export const ENEMY_BASE_HP = 80;
-export const ENEMY_HP_SCALING = 40;
-export const ENEMY_BASE_ATTACK_RATE_MS = 1200;
-export const ENEMY_ATTACK_RATE_DECAY = 50; // gets faster per tier (lower = faster)
+export const ENEMY_BASE_DAMAGE = 1;
+export const ENEMY_DAMAGE_SCALING = 1; // 1..10 across 10 tiers
+export const ENEMY_BASE_HP = 10;
+export const ENEMY_HP_SCALING = 10; // 10..100 across 10 tiers
+export const ENEMY_BASE_ATTACK_RATE_MS = 2000;
+export const ENEMY_ATTACK_RATE_DECAY = 200; // 2000..200 across 10 tiers
 
 // Combat playback (UI-side, but balance-tunable)
 export const COMBAT_PLAYBACK_SPEED = 1; // 1 = real-time, 2 = 2x speed, etc.

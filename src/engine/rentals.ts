@@ -1,5 +1,5 @@
 import type { Unit, UnitStats } from "./units";
-import { generateUnitId } from "./units";
+import { generateUnitId, clampStats } from "./units";
 import type { RNG } from "./rng";
 import {
   RENTAL_STAT_BUDGET_MULTIPLIER,
@@ -29,14 +29,11 @@ export function generateRentals(params: RentalSearchParams, rng: RNG): Rental[] 
 
   for (let i = 0; i < params.resultCount; i++) {
     const variance = () => 1 + (rng.next() - 0.5) * 0.2; // ±10% variance on rentals
-    const stats: UnitStats = {
-      damage: Math.round(STARTER_DAMAGE * qualityMultiplier * variance()),
-      hp: Math.round(STARTER_HP * qualityMultiplier * variance()),
-      attackRateMs: Math.max(
-        100,
-        Math.round(STARTER_ATTACK_RATE_MS / qualityMultiplier * variance()),
-      ),
-    };
+    const stats: UnitStats = clampStats({
+      damage: STARTER_DAMAGE * qualityMultiplier * variance(),
+      hp: STARTER_HP * qualityMultiplier * variance(),
+      attackRateMs: STARTER_ATTACK_RATE_MS / qualityMultiplier * variance(),
+    });
     results.push({
       unit: {
         id: generateUnitId(),
