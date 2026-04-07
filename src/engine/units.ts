@@ -73,11 +73,18 @@ export function createStarterUnit(rng: RNG): Unit {
   };
 }
 
-/** Format a stat value for display — rounds to 2 decimal places, trims trailing zeros. */
-export function fmtStat(value: number): string {
-  if (Number.isInteger(value)) return String(value);
+/** Format a stat value for display with stat-appropriate precision. */
+export function fmtStat(value: number, stat?: keyof UnitStats): string {
+  if (stat === "attackRateMs") return Math.round(value).toString();
+  if (stat === "hp") return value.toFixed(1).replace(/\.0$/, "");
+  // damage: 2 decimal places
   return value.toFixed(2).replace(/\.?0+$/, "");
 }
+
+/** Shorthand formatters for specific stats. */
+export function fmtDmg(v: number): string { return fmtStat(v, "damage"); }
+export function fmtHp(v: number): string { return fmtStat(v, "hp"); }
+export function fmtRate(v: number): string { return fmtStat(v, "attackRateMs"); }
 
 export function createUnit(
   id: string,

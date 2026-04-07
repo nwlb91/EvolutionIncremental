@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { fmtStat } from "../engine/units";
+import { fmtDmg, fmtHp, fmtRate } from "../engine/units";
 import type { Rental } from "../engine/rentals";
 import { generateRentals } from "../engine/rentals";
 import { rentalSearchCost } from "../engine/economy";
@@ -79,7 +79,7 @@ export function RentalPanel({ rentals, money, dispatch, rng }: Props) {
           {searchResults.map((r) => (
             <div key={r.unit.id} style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 4 }}>
               <span>
-                DMG:{fmtStat(r.unit.stats.damage)} HP:{fmtStat(r.unit.stats.hp)} Rate:{fmtStat(r.unit.stats.attackRateMs)}ms
+                DMG:{fmtDmg(r.unit.stats.damage)} HP:{fmtHp(r.unit.stats.hp)} Rate:{fmtRate(r.unit.stats.attackRateMs)}ms
               </span>
               <button onClick={() => handleHire(r)}>Hire</button>
             </div>

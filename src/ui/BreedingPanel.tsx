@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { fmtStat, type Unit, type UnitStats } from "../engine/units";
+import { fmtDmg, fmtHp, fmtRate, fmtStat, type Unit, type UnitStats } from "../engine/units";
 import type { Rental } from "../engine/rentals";
 import type { BreedingOperation } from "../engine/breeding";
 import { startBreeding, isBreedingComplete, resolveBreeding } from "../engine/breeding";
@@ -9,16 +9,21 @@ import type { RNG } from "../engine/rng";
 
 type KeyStat = keyof UnitStats | "none";
 
+const ALL_STATS: (keyof UnitStats)[] = ["damage", "hp", "attackRateMs"];
+
 /** For damage & hp, higher is better. For attackRateMs, lower is better. */
 function statIsBetter(stat: keyof UnitStats, a: number, b: number): boolean {
   if (stat === "attackRateMs") return a < b;
   return a > b;
 }
 
+function statIsWorseOrEqual(stat: keyof UnitStats, a: number, b: number): boolean {
+  return !statIsBetter(stat, a, b);
+}
+
 /** Does the child beat either parent on at least one stat? */
 function hasAnyStatImprovement(child: UnitStats, a: UnitStats, b: UnitStats): boolean {
-  const stats: (keyof UnitStats)[] = ["damage", "hp", "attackRateMs"];
-  return stats.some((s) => {
+  return ALL_STATS.some((s) => {
     const bestParent = statIsBetter(s, a[s], b[s]) ? a[s] : b[s];
     return statIsBetter(s, child[s], bestParent);
   });
@@ -33,13 +38,17 @@ function hasNewMutation(child: Unit, parentA: Unit, parentB: Unit): boolean {
   return child.mutations.some((m) => !parentMutIds.has(m.id));
 }
 
-function statLabel(stat: KeyStat): string {
+function statLabel(stat: keyof UnitStats | "none"): string {
   switch (stat) {
     case "damage": return "DMG";
     case "hp": return "HP";
-    case "attackRateMs": return "Rate (lower=faster)";
+    case "attackRateMs": return "Rate";
     default: return "";
   }
+}
+
+function fmtStatByKey(stat: keyof UnitStats, value: number): string {
+  return fmtStat(value, stat);
 }
 
 interface Props {
@@ -61,13 +70,14 @@ export function BreedingPanel({ roster, rentals, breeding, dispatch, rng, exclud
   const [autoDismiss, setAutoDismiss] = useState(false);
   const [keepIfStatImproved, setKeepIfStatImproved] = useState(true);
   const [keepIfNewMutation, setKeepIfNewMutation] = useState(true);
+  const [noRegressionGuard, setNoRegressionGuard] = useState(false);
+  const [guardedStats, setGuardedStats] = useState<Set<keyof UnitStats>>(new Set());
   const [lastChildInfo, setLastChildInfo] = useState<string | null>(null);
   const [breedSpeed, setBreedSpeed] = useState(1);
-  const [variationPct, setVariationPct] = useState(1); // default 1%
+  const [variationPct, setVariationPct] = useState(1);
 
   const pendingAutoStart = useRef(false);
 
-  // All available units (owned + rentals), excluding busy units
   const allUnits: Unit[] = [
     ...Object.values(roster),
     ...Object.values(rentals).map((r) => r.unit),
@@ -78,7 +88,6 @@ export function BreedingPanel({ roster, rentals, breeding, dispatch, rng, exclud
     [roster, rentals],
   );
 
-  // Report breeding unit IDs to parent
   useEffect(() => {
     if (breeding) {
       onBreedingUnitsChange(new Set([breeding.parentA, breeding.parentB]));
@@ -87,7 +96,6 @@ export function BreedingPanel({ roster, rentals, breeding, dispatch, rng, exclud
     }
   }, [breeding, onBreedingUnitsChange]);
 
-  // Auto-start breeding when idle + auto-breed is on + both parents selected
   useEffect(() => {
     if (!autoBreed || breeding || pendingAutoStart.current) return;
     if (!parentA || !parentB || parentA === parentB) return;
@@ -101,9 +109,8 @@ export function BreedingPanel({ roster, rentals, breeding, dispatch, rng, exclud
       dispatch({ type: "START_BREEDING", op });
     }, 100);
     return () => { clearTimeout(t); pendingAutoStart.current = false; };
-  }, [autoBreed, breeding, parentA, parentB, findUnit, dispatch]);
+  }, [autoBreed, breeding, parentA, parentB, findUnit, dispatch, breedSpeed]);
 
-  // Progress ticker + completion handler
   useEffect(() => {
     if (!breeding) {
       setProgress(0);
@@ -137,6 +144,28 @@ export function BreedingPanel({ roster, rentals, breeding, dispatch, rng, exclud
             const worseVal = aIsWorse ? aVal : bVal;
 
             if (statIsBetter(stat, childVal, worseVal)) {
+              // Check no-regression guard: child must not regress on guarded stats
+              // compared to the parent it would replace
+              if (noRegressionGuard && guardedStats.size > 0) {
+                const regressions: string[] = [];
+                for (const gs of guardedStats) {
+                  if (statIsWorseOrEqual(gs, child.stats[gs], worseParent.stats[gs])
+                      && child.stats[gs] !== worseParent.stats[gs]) {
+                    regressions.push(
+                      `${statLabel(gs)}: ${fmtStatByKey(gs, worseParent.stats[gs])} → ${fmtStatByKey(gs, child.stats[gs])}`,
+                    );
+                  }
+                }
+                if (regressions.length > 0) {
+                  // Would regress — don't replace, dismiss child instead
+                  dispatch({ type: "REMOVE_UNIT", unitId: child.id });
+                  setLastChildInfo(
+                    `Skipped replacement — regression: ${regressions.join(", ")}`,
+                  );
+                  return;
+                }
+              }
+
               dispatch({ type: "REMOVE_UNIT", unitId: worseParent.id });
               if (aIsWorse) {
                 setParentA(child.id);
@@ -145,7 +174,7 @@ export function BreedingPanel({ roster, rentals, breeding, dispatch, rng, exclud
               }
               setLastChildInfo(
                 `Replaced ${worseParent.name || worseParent.id.slice(0, 12)} ` +
-                `(${statLabel(stat)}: ${fmtStat(worseVal)} → ${fmtStat(childVal)})`,
+                `(${statLabel(stat)}: ${fmtStatByKey(stat, worseVal)} → ${fmtStatByKey(stat, childVal)})`,
               );
               return;
             }
@@ -153,7 +182,6 @@ export function BreedingPanel({ roster, rentals, breeding, dispatch, rng, exclud
 
           // --- Auto-dismiss logic ---
           if (autoBreed && autoDismiss) {
-            // Check exceptions before dismissing
             const shouldKeep =
               (keepIfStatImproved && hasAnyStatImprovement(child.stats, a.stats, b.stats)) ||
               (keepIfNewMutation && hasNewMutation(child, a, b));
@@ -161,7 +189,7 @@ export function BreedingPanel({ roster, rentals, breeding, dispatch, rng, exclud
             if (!shouldKeep) {
               dispatch({ type: "REMOVE_UNIT", unitId: child.id });
               setLastChildInfo(
-                `Auto-dismissed offspring (DMG:${fmtStat(child.stats.damage)} HP:${fmtStat(child.stats.hp)} Rate:${fmtStat(child.stats.attackRateMs)})`,
+                `Auto-dismissed (DMG:${fmtDmg(child.stats.damage)} HP:${fmtHp(child.stats.hp)} Rate:${fmtRate(child.stats.attackRateMs)})`,
               );
               return;
             } else {
@@ -173,7 +201,7 @@ export function BreedingPanel({ roster, rentals, breeding, dispatch, rng, exclud
                 reasons.push("new mutation");
               }
               setLastChildInfo(
-                `Kept offspring — ${reasons.join(", ")} (DMG:${fmtStat(child.stats.damage)} HP:${fmtStat(child.stats.hp)} Rate:${fmtStat(child.stats.attackRateMs)})`,
+                `Kept — ${reasons.join(", ")} (DMG:${fmtDmg(child.stats.damage)} HP:${fmtHp(child.stats.hp)} Rate:${fmtRate(child.stats.attackRateMs)})`,
               );
               return;
             }
@@ -187,12 +215,22 @@ export function BreedingPanel({ roster, rentals, breeding, dispatch, rng, exclud
       }
     }, 200);
     return () => clearInterval(id);
-  }, [breeding, findUnit, rng, dispatch, autoBreed, keyStat, autoDismiss, keepIfStatImproved, keepIfNewMutation, variationPct]);
+  }, [breeding, findUnit, rng, dispatch, autoBreed, keyStat, autoDismiss, keepIfStatImproved, keepIfNewMutation, variationPct, noRegressionGuard, guardedStats]);
 
   const handleStart = () => {
     if (!parentA || !parentB || parentA === parentB) return;
     const op = startBreeding(parentA, parentB, Date.now());
+    op.durationMs = Math.round(BREEDING_DURATION_MS / breedSpeed);
     dispatch({ type: "START_BREEDING", op });
+  };
+
+  const toggleGuardedStat = (stat: keyof UnitStats) => {
+    setGuardedStats((prev) => {
+      const next = new Set(prev);
+      if (next.has(stat)) next.delete(stat);
+      else next.add(stat);
+      return next;
+    });
   };
 
   const parentAUnit = findUnit(parentA);
@@ -213,7 +251,7 @@ export function BreedingPanel({ roster, rentals, breeding, dispatch, rng, exclud
             <option value="">-- select --</option>
             {allUnits.map((u) => (
               <option key={u.id} value={u.id}>
-                {u.name || u.id.slice(0, 16)} (DMG:{fmtStat(u.stats.damage)} HP:{fmtStat(u.stats.hp)} Rate:{fmtStat(u.stats.attackRateMs)})
+                {u.name || u.id.slice(0, 16)} (DMG:{fmtDmg(u.stats.damage)} HP:{fmtHp(u.stats.hp)} Rate:{fmtRate(u.stats.attackRateMs)})
               </option>
             ))}
           </select>
@@ -228,7 +266,7 @@ export function BreedingPanel({ roster, rentals, breeding, dispatch, rng, exclud
               .filter((u) => u.id !== parentA)
               .map((u) => (
                 <option key={u.id} value={u.id}>
-                  {u.name || u.id.slice(0, 16)} (DMG:{fmtStat(u.stats.damage)} HP:{fmtStat(u.stats.hp)} Rate:{fmtStat(u.stats.attackRateMs)})
+                  {u.name || u.id.slice(0, 16)} (DMG:{fmtDmg(u.stats.damage)} HP:{fmtHp(u.stats.hp)} Rate:{fmtRate(u.stats.attackRateMs)})
                 </option>
               ))}
           </select>
@@ -238,9 +276,9 @@ export function BreedingPanel({ roster, rentals, breeding, dispatch, rng, exclud
 
       {parentAUnit && parentBUnit && (
         <div style={{ fontSize: 11, color: "#888", marginBottom: 8, lineHeight: 1.6 }}>
-          A: DMG {fmtStat(parentAUnit.stats.damage)} | HP {fmtStat(parentAUnit.stats.hp)} | Rate {fmtStat(parentAUnit.stats.attackRateMs)}
+          A: DMG {fmtDmg(parentAUnit.stats.damage)} | HP {fmtHp(parentAUnit.stats.hp)} | Rate {fmtRate(parentAUnit.stats.attackRateMs)}
           <br />
-          B: DMG {fmtStat(parentBUnit.stats.damage)} | HP {fmtStat(parentBUnit.stats.hp)} | Rate {fmtStat(parentBUnit.stats.attackRateMs)}
+          B: DMG {fmtDmg(parentBUnit.stats.damage)} | HP {fmtHp(parentBUnit.stats.hp)} | Rate {fmtRate(parentBUnit.stats.attackRateMs)}
         </div>
       )}
 
@@ -333,6 +371,42 @@ export function BreedingPanel({ roster, rentals, breeding, dispatch, rng, exclud
                 <option value="attackRateMs">Attack Rate (lower = better)</option>
               </select>
             </label>
+
+            {/* No-regression guard */}
+            {keyStat !== "none" && (
+              <>
+                <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
+                  <input
+                    type="checkbox"
+                    checked={noRegressionGuard}
+                    onChange={(e) => setNoRegressionGuard(e.target.checked)}
+                  />
+                  <span style={{ fontSize: 12 }}>Don't replace if these stats regress</span>
+                </label>
+
+                {noRegressionGuard && (
+                  <div style={{ marginLeft: 20, display: "flex", flexDirection: "column", gap: 3 }}>
+                    {ALL_STATS.map((s) => (
+                      <label key={s} style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
+                        <input
+                          type="checkbox"
+                          checked={guardedStats.has(s)}
+                          onChange={() => toggleGuardedStat(s)}
+                        />
+                        <span style={{ fontSize: 11, color: "#aaa" }}>
+                          {statLabel(s)}
+                          {parentAUnit && parentBUnit && (
+                            <span style={{ color: "#666", marginLeft: 4 }}>
+                              (A: {fmtStatByKey(s, parentAUnit.stats[s])}, B: {fmtStatByKey(s, parentBUnit.stats[s])})
+                            </span>
+                          )}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
 
             <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
               <input

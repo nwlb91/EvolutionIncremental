@@ -1,4 +1,4 @@
-import { fmtStat, type Unit } from "../engine/units";
+import { fmtDmg, fmtHp, fmtRate, type Unit } from "../engine/units";
 import type { GameAction } from "../engine/state";
 
 interface Props {
@@ -55,9 +55,9 @@ export function RosterView({ roster, dispatch, selectedId, onSelect }: Props) {
                   style={{ width: 100, background: "#111", color: "#eee", border: "1px solid #444" }}
                 />
               </td>
-              <td>{fmtStat(u.stats.damage)}</td>
-              <td>{fmtStat(u.stats.hp)}</td>
-              <td>{fmtStat(u.stats.attackRateMs)}</td>
+              <td>{fmtDmg(u.stats.damage)}</td>
+              <td>{fmtHp(u.stats.hp)}</td>
+              <td>{fmtRate(u.stats.attackRateMs)}</td>
               <td>
                 <button
                   onClick={(e) => {
