@@ -83,7 +83,7 @@ export function BreedingPanel({ roster, breeding, dispatch, rng, excludeUnitIds,
   const [keepIfEquivalent, setKeepIfEquivalent] = useState(false);
   const [noRegressionGuard, setNoRegressionGuard] = useState(false);
   const [guardedStats, setGuardedStats] = useState<Set<keyof UnitStats>>(new Set());
-  const [farmMutations, setGuardMutations] = useState(false);
+  const [farmMutations, setFarmMutations] = useState(false);
   const [lastChildInfo, setLastChildInfo] = useState<string | null>(null);
   const [breedSpeed, setBreedSpeed] = useState(1);
   const [variationPct, setVariationPct] = useState(1);
@@ -141,87 +141,95 @@ export function BreedingPanel({ roster, breeding, dispatch, rng, excludeUnitIds,
           dispatch({ type: "COMPLETE_BREEDING", child });
           dispatch({ type: "UPDATE_RNG_STATE", state: rng.state() });
 
-          // --- Auto-replace logic (key stat) ---
-          if (autoBreed && keyStat !== "none") {
-            const stat = keyStat;
+          // --- Auto-replace logic ---
+          if (autoBreed && (keyStat !== "none" || farmMutations)) {
             const childMutIds = new Set(child.mutations.map((m) => m.mutationId));
+            const aMutIds = new Set(a.mutations.map((m) => m.mutationId));
+            const bMutIds = new Set(b.mutations.map((m) => m.mutationId));
+
+            // Farm mode target: if child has a mutation one parent lacks, target that parent
+            let farmTarget: "a" | "b" | null = null;
+            if (farmMutations) {
+              const spreadsToA = child.mutations.some((m) => !aMutIds.has(m.mutationId) && bMutIds.has(m.mutationId));
+              const spreadsToB = child.mutations.some((m) => !bMutIds.has(m.mutationId) && aMutIds.has(m.mutationId));
+              if (spreadsToA && !spreadsToB) farmTarget = "a";
+              else if (spreadsToB && !spreadsToA) farmTarget = "b";
+            }
 
             // Determine replacement target
             let target: Unit;
             let targetIsA: boolean;
 
-            if (farmMutations) {
-              // Farm mode: if child has a mutation one parent lacks, target that parent
-              const aMutIds = new Set(a.mutations.map((m) => m.mutationId));
-              const bMutIds = new Set(b.mutations.map((m) => m.mutationId));
-              const childSpreadsToA = child.mutations.some((m) => !aMutIds.has(m.mutationId) && bMutIds.has(m.mutationId));
-              const childSpreadsToB = child.mutations.some((m) => !bMutIds.has(m.mutationId) && aMutIds.has(m.mutationId));
-
-              if (childSpreadsToA && !childSpreadsToB) {
-                target = a; targetIsA = true;
-              } else if (childSpreadsToB && !childSpreadsToA) {
-                target = b; targetIsA = false;
-              } else {
-                // Both or neither — fall back to worse stat parent
-                const aIsWorse = statIsBetter(stat, b.stats[stat], a.stats[stat]);
-                target = aIsWorse ? a : b;
-                targetIsA = aIsWorse;
-              }
-            } else {
+            if (farmTarget) {
+              // Farm mode overrides key stat targeting
+              target = farmTarget === "a" ? a : b;
+              targetIsA = farmTarget === "a";
+            } else if (keyStat !== "none") {
+              const stat = keyStat;
               const aIsWorse = statIsBetter(stat, b.stats[stat], a.stats[stat]);
               target = aIsWorse ? a : b;
               targetIsA = aIsWorse;
+            } else {
+              // Farm mode on but no asymmetric mutation and no key stat — nothing to do
+              // Fall through to auto-dismiss
+              target = null as unknown as Unit;
+              targetIsA = false;
             }
 
-            const targetVal = target.stats[stat];
-            if (!statIsBetter(stat, child.stats[stat], targetVal)) {
-              // Child doesn't beat the target on the key stat — skip replacement
-            } else {
-              // Check no-regression guard
-              if (noRegressionGuard && guardedStats.size > 0) {
-                const regressions: string[] = [];
-                for (const gs of guardedStats) {
-                  if (statIsWorseOrEqual(gs, child.stats[gs], target.stats[gs])
-                      && child.stats[gs] !== target.stats[gs]) {
-                    regressions.push(
-                      `${statLabel(gs)}: ${fmtStatByKey(gs, target.stats[gs])} → ${fmtStatByKey(gs, child.stats[gs])}`,
+            // Only proceed if we have a valid target
+            if (target) {
+              // Key stat check: skip if child doesn't beat target (unless farm mode overrode targeting)
+              const statOk = keyStat === "none" || statIsBetter(keyStat, child.stats[keyStat], target.stats[keyStat]);
+
+              if (farmTarget || statOk) {
+                // Check no-regression guard
+                if (noRegressionGuard && guardedStats.size > 0) {
+                  const regressions: string[] = [];
+                  for (const gs of guardedStats) {
+                    if (statIsWorseOrEqual(gs, child.stats[gs], target.stats[gs])
+                        && child.stats[gs] !== target.stats[gs]) {
+                      regressions.push(
+                        `${statLabel(gs)}: ${fmtStatByKey(gs, target.stats[gs])} → ${fmtStatByKey(gs, child.stats[gs])}`,
+                      );
+                    }
+                  }
+                  if (regressions.length > 0) {
+                    dispatch({ type: "REMOVE_UNIT", unitId: child.id });
+                    setLastChildInfo(
+                      `Skipped replacement — regression: ${regressions.join(", ")}`,
                     );
+                    return;
                   }
                 }
-                if (regressions.length > 0) {
-                  dispatch({ type: "REMOVE_UNIT", unitId: child.id });
-                  setLastChildInfo(
-                    `Skipped replacement — regression: ${regressions.join(", ")}`,
-                  );
-                  return;
-                }
-              }
 
-              // Farm mode: child must have every mutation the target parent has
-              if (farmMutations && target.mutations.length > 0) {
-                const missing = target.mutations
-                  .filter((m) => !childMutIds.has(m.mutationId))
-                  .map((m) => getMutation(m.mutationId).name);
-                if (missing.length > 0) {
-                  dispatch({ type: "REMOVE_UNIT", unitId: child.id });
-                  setLastChildInfo(
-                    `Skipped — offspring missing: ${missing.join(", ")}`,
-                  );
-                  return;
+                // Farm mode: child must have every mutation the target parent has
+                if (farmMutations && target.mutations.length > 0) {
+                  const missing = target.mutations
+                    .filter((m) => !childMutIds.has(m.mutationId))
+                    .map((m) => getMutation(m.mutationId).name);
+                  if (missing.length > 0) {
+                    dispatch({ type: "REMOVE_UNIT", unitId: child.id });
+                    setLastChildInfo(
+                      `Skipped — offspring missing: ${missing.join(", ")}`,
+                    );
+                    return;
+                  }
                 }
-              }
 
-              dispatch({ type: "REMOVE_UNIT", unitId: target.id });
-              if (targetIsA) {
-                setParentA(child.id);
-              } else {
-                setParentB(child.id);
+                const targetName = target.name || target.id.slice(0, 12);
+                dispatch({ type: "REMOVE_UNIT", unitId: target.id });
+                if (targetIsA) {
+                  setParentA(child.id);
+                } else {
+                  setParentB(child.id);
+                }
+
+                const detail = keyStat !== "none"
+                  ? `${statLabel(keyStat)}: ${fmtStatByKey(keyStat, target.stats[keyStat])} → ${fmtStatByKey(keyStat, child.stats[keyStat])}`
+                  : "mutation spread";
+                setLastChildInfo(`Replaced ${targetName} (${detail})`);
+                return;
               }
-              setLastChildInfo(
-                `Replaced ${target.name || target.id.slice(0, 12)} ` +
-                `(${statLabel(stat)}: ${fmtStatByKey(stat, targetVal)} → ${fmtStatByKey(stat, child.stats[stat])})`,
-              );
-              return;
             }
           }
 
@@ -427,50 +435,45 @@ export function BreedingPanel({ roster, breeding, dispatch, rng, excludeUnitIds,
               </select>
             </label>
 
-            {/* No-regression guard */}
-            {keyStat !== "none" && (
-              <>
-                <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
-                  <input
-                    type="checkbox"
-                    checked={noRegressionGuard}
-                    onChange={(e) => setNoRegressionGuard(e.target.checked)}
-                  />
-                  <span style={{ fontSize: 12 }}>Don't replace if these stats regress</span>
-                </label>
+            <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
+              <input
+                type="checkbox"
+                checked={noRegressionGuard}
+                onChange={(e) => setNoRegressionGuard(e.target.checked)}
+              />
+              <span style={{ fontSize: 12 }}>Don't replace if these stats regress</span>
+            </label>
 
-                {noRegressionGuard && (
-                  <div style={{ marginLeft: 20, display: "flex", flexDirection: "column", gap: 3 }}>
-                    {ALL_STATS.map((s) => (
-                      <label key={s} style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
-                        <input
-                          type="checkbox"
-                          checked={guardedStats.has(s)}
-                          onChange={() => toggleGuardedStat(s)}
-                        />
-                        <span style={{ fontSize: 11, color: "#aaa" }}>
-                          {statLabel(s)}
-                          {parentAUnit && parentBUnit && (
-                            <span style={{ color: "#666", marginLeft: 4 }}>
-                              (A: {fmtStatByKey(s, parentAUnit.stats[s])}, B: {fmtStatByKey(s, parentBUnit.stats[s])})
-                            </span>
-                          )}
+            {noRegressionGuard && (
+              <div style={{ marginLeft: 20, display: "flex", flexDirection: "column", gap: 3 }}>
+                {ALL_STATS.map((s) => (
+                  <label key={s} style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
+                    <input
+                      type="checkbox"
+                      checked={guardedStats.has(s)}
+                      onChange={() => toggleGuardedStat(s)}
+                    />
+                    <span style={{ fontSize: 11, color: "#aaa" }}>
+                      {statLabel(s)}
+                      {parentAUnit && parentBUnit && (
+                        <span style={{ color: "#666", marginLeft: 4 }}>
+                          (A: {fmtStatByKey(s, parentAUnit.stats[s])}, B: {fmtStatByKey(s, parentBUnit.stats[s])})
                         </span>
-                      </label>
-                    ))}
-                  </div>
-                )}
-
-                <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
-                  <input
-                    type="checkbox"
-                    checked={farmMutations}
-                    onChange={(e) => setGuardMutations(e.target.checked)}
-                  />
-                  <span style={{ fontSize: 12 }}>Farm mutations</span>
-                </label>
-              </>
+                      )}
+                    </span>
+                  </label>
+                ))}
+              </div>
             )}
+
+            <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
+              <input
+                type="checkbox"
+                checked={farmMutations}
+                onChange={(e) => setFarmMutations(e.target.checked)}
+              />
+              <span style={{ fontSize: 12 }}>Farm mutations</span>
+            </label>
 
             <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
               <input
