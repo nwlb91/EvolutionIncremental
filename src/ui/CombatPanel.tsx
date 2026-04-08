@@ -123,21 +123,23 @@ function FighterCard({
         Cooldown
       </div>
       <Bar value={attackRateMs - c.timerMs} max={attackRateMs} color="#38f" height={14} />
-      {flash === "attack" && (
-        <div style={{ marginTop: 4, fontSize: 12, color: "#4f4", fontWeight: "bold" }}>
-          HIT! -{tick.damage}
-        </div>
-      )}
-      {flash === "hit" && c.hp > 0 && (
-        <div style={{ marginTop: 4, fontSize: 12, color: "#f44" }}>
-          Took damage!
-        </div>
-      )}
-      {c.hp <= 0 && (
-        <div style={{ marginTop: 4, fontSize: 13, color: "#f44", fontWeight: "bold" }}>
-          DEFEATED
-        </div>
-      )}
+      <div style={{ marginTop: 4, height: 20, fontSize: 12 }}>
+        {flash === "attack" && (
+          <span style={{ color: "#4f4", fontWeight: "bold" }}>
+            HIT! -{tick.damage}
+          </span>
+        )}
+        {flash === "hit" && c.hp > 0 && (
+          <span style={{ color: "#f44" }}>
+            Took damage!
+          </span>
+        )}
+        {c.hp <= 0 && (
+          <span style={{ color: "#f44", fontWeight: "bold", fontSize: 13 }}>
+            DEFEATED
+          </span>
+        )}
+      </div>
     </div>
   );
 }
