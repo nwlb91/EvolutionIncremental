@@ -466,31 +466,33 @@ export function BreedingPanel({ roster, breeding, dispatch, rng, excludeUnitIds,
                 )}
 
                 {/* Required mutations guard */}
-                {parentMutationIds.length > 0 && (
-                  <>
-                    <div style={{ fontSize: 12, marginTop: 4 }}>Don't replace if offspring is missing:</div>
-                    <div style={{ marginLeft: 20, display: "flex", flexDirection: "column", gap: 3 }}>
-                      {parentMutationIds.map((mutId) => {
-                        const def = getMutation(mutId);
-                        const onA = parentAUnit?.mutations.some((m) => m.mutationId === mutId);
-                        const onB = parentBUnit?.mutations.some((m) => m.mutationId === mutId);
-                        const who = onA && onB ? "A+B" : onA ? "A" : "B";
-                        return (
-                          <label key={mutId} style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
-                            <input
-                              type="checkbox"
-                              checked={requiredMutations.has(mutId)}
-                              onChange={() => toggleRequiredMutation(mutId)}
-                            />
-                            <span style={{ fontSize: 11, color: "#aaa" }}>
-                              {def.name}
-                              <span style={{ color: "#666", marginLeft: 4 }}>({who})</span>
-                            </span>
-                          </label>
-                        );
-                      })}
-                    </div>
-                  </>
+                <div style={{ fontSize: 12, marginTop: 4 }}>Don't replace if offspring is missing:</div>
+                {parentMutationIds.length > 0 ? (
+                  <div style={{ marginLeft: 20, display: "flex", flexDirection: "column", gap: 3 }}>
+                    {parentMutationIds.map((mutId) => {
+                      const def = getMutation(mutId);
+                      const onA = parentAUnit?.mutations.some((m) => m.mutationId === mutId);
+                      const onB = parentBUnit?.mutations.some((m) => m.mutationId === mutId);
+                      const who = onA && onB ? "A+B" : onA ? "A" : "B";
+                      return (
+                        <label key={mutId} style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
+                          <input
+                            type="checkbox"
+                            checked={requiredMutations.has(mutId)}
+                            onChange={() => toggleRequiredMutation(mutId)}
+                          />
+                          <span style={{ fontSize: 11, color: "#aaa" }}>
+                            {def.name}
+                            <span style={{ color: "#666", marginLeft: 4 }}>({who})</span>
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div style={{ marginLeft: 20, fontSize: 11, color: "#555" }}>
+                    Neither parent has mutations.
+                  </div>
                 )}
               </>
             )}
