@@ -83,7 +83,7 @@ export function BreedingPanel({ roster, breeding, dispatch, rng, excludeUnitIds,
   const [keepIfEquivalent, setKeepIfEquivalent] = useState(false);
   const [noRegressionGuard, setNoRegressionGuard] = useState(false);
   const [guardedStats, setGuardedStats] = useState<Set<keyof UnitStats>>(new Set());
-  const [requiredMutations, setRequiredMutations] = useState<Set<string>>(new Set());
+  const [guardMutations, setGuardMutations] = useState(false);
   const [lastChildInfo, setLastChildInfo] = useState<string | null>(null);
   const [breedSpeed, setBreedSpeed] = useState(1);
   const [variationPct, setVariationPct] = useState(1);
@@ -175,19 +175,16 @@ export function BreedingPanel({ roster, breeding, dispatch, rng, excludeUnitIds,
                 }
               }
 
-              // Check required mutations guard: child must have all required mutations
-              if (requiredMutations.size > 0) {
+              // Check mutation guard: child must have every mutation the replaced parent has
+              if (guardMutations && worseParent.mutations.length > 0) {
                 const childMutIds = new Set(child.mutations.map((m) => m.mutationId));
-                const missing: string[] = [];
-                for (const reqId of requiredMutations) {
-                  if (!childMutIds.has(reqId)) {
-                    missing.push(getMutation(reqId).name);
-                  }
-                }
+                const missing = worseParent.mutations
+                  .filter((m) => !childMutIds.has(m.mutationId))
+                  .map((m) => getMutation(m.mutationId).name);
                 if (missing.length > 0) {
                   dispatch({ type: "REMOVE_UNIT", unitId: child.id });
                   setLastChildInfo(
-                    `Skipped replacement — missing mutation: ${missing.join(", ")}`,
+                    `Skipped — offspring missing: ${missing.join(", ")}`,
                   );
                   return;
                 }
@@ -243,35 +240,13 @@ export function BreedingPanel({ roster, breeding, dispatch, rng, excludeUnitIds,
       }
     }, 200);
     return () => clearInterval(id);
-  }, [breeding, findUnit, rng, dispatch, autoBreed, keyStat, autoDismiss, keepIfStatImproved, keepIfNewMutation, keepIfEquivalent, variationPct, noRegressionGuard, guardedStats, requiredMutations]);
+  }, [breeding, findUnit, rng, dispatch, autoBreed, keyStat, autoDismiss, keepIfStatImproved, keepIfNewMutation, keepIfEquivalent, variationPct, noRegressionGuard, guardedStats, guardMutations]);
 
   const handleStart = () => {
     if (!parentA || !parentB || parentA === parentB) return;
     const op = startBreeding(parentA, parentB, Date.now());
     op.durationMs = Math.round(BREEDING_DURATION_MS / breedSpeed);
     dispatch({ type: "START_BREEDING", op });
-  };
-
-  // Collect unique mutation IDs across both parents for the UI
-  const parentMutationIds: string[] = [];
-  const seen = new Set<string>();
-  for (const u of [parentAUnit, parentBUnit]) {
-    if (!u) continue;
-    for (const m of u.mutations) {
-      if (!seen.has(m.mutationId)) {
-        seen.add(m.mutationId);
-        parentMutationIds.push(m.mutationId);
-      }
-    }
-  }
-
-  const toggleRequiredMutation = (mutId: string) => {
-    setRequiredMutations((prev) => {
-      const next = new Set(prev);
-      if (next.has(mutId)) next.delete(mutId);
-      else next.add(mutId);
-      return next;
-    });
   };
 
   const toggleGuardedStat = (stat: keyof UnitStats) => {
@@ -465,35 +440,14 @@ export function BreedingPanel({ roster, breeding, dispatch, rng, excludeUnitIds,
                   </div>
                 )}
 
-                {/* Required mutations guard */}
-                <div style={{ fontSize: 12, marginTop: 4 }}>Don't replace if offspring is missing:</div>
-                {parentMutationIds.length > 0 ? (
-                  <div style={{ marginLeft: 20, display: "flex", flexDirection: "column", gap: 3 }}>
-                    {parentMutationIds.map((mutId) => {
-                      const def = getMutation(mutId);
-                      const onA = parentAUnit?.mutations.some((m) => m.mutationId === mutId);
-                      const onB = parentBUnit?.mutations.some((m) => m.mutationId === mutId);
-                      const who = onA && onB ? "A+B" : onA ? "A" : "B";
-                      return (
-                        <label key={mutId} style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
-                          <input
-                            type="checkbox"
-                            checked={requiredMutations.has(mutId)}
-                            onChange={() => toggleRequiredMutation(mutId)}
-                          />
-                          <span style={{ fontSize: 11, color: "#aaa" }}>
-                            {def.name}
-                            <span style={{ color: "#666", marginLeft: 4 }}>({who})</span>
-                          </span>
-                        </label>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div style={{ marginLeft: 20, fontSize: 11, color: "#555" }}>
-                    Neither parent has mutations.
-                  </div>
-                )}
+                <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
+                  <input
+                    type="checkbox"
+                    checked={guardMutations}
+                    onChange={(e) => setGuardMutations(e.target.checked)}
+                  />
+                  <span style={{ fontSize: 12 }}>Don't replace if offspring is missing a mutation</span>
+                </label>
               </>
             )}
 
