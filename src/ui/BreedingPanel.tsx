@@ -327,8 +327,18 @@ export function BreedingPanel({ roster, breeding, dispatch, rng, excludeUnitIds,
       {parentAUnit && parentBUnit && (
         <div style={{ fontSize: 11, color: "#888", marginBottom: 8, lineHeight: 1.6 }}>
           A: DMG {fmtDmg(parentAUnit.stats.damage)} | HP {fmtHp(parentAUnit.stats.hp)} | Rate {fmtRate(parentAUnit.stats.attackRateMs)}
+          {parentAUnit.mutations.length > 0 && (
+            <span style={{ color: "#aaa" }}>
+              {" "}| {parentAUnit.mutations.map((m) => `${getMutation(m.mutationId).name} T${m.tier}`).join(", ")}
+            </span>
+          )}
           <br />
           B: DMG {fmtDmg(parentBUnit.stats.damage)} | HP {fmtHp(parentBUnit.stats.hp)} | Rate {fmtRate(parentBUnit.stats.attackRateMs)}
+          {parentBUnit.mutations.length > 0 && (
+            <span style={{ color: "#aaa" }}>
+              {" "}| {parentBUnit.mutations.map((m) => `${getMutation(m.mutationId).name} T${m.tier}`).join(", ")}
+            </span>
+          )}
         </div>
       )}
 
