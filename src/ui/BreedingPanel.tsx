@@ -326,33 +326,32 @@ export function BreedingPanel({ roster, breeding, dispatch, rng, excludeUnitIds,
         </label>
       </div>
 
-      {breeding && (
-        <div style={{ marginBottom: 8 }}>
-          <p style={{ fontSize: 13 }}>Breeding in progress... ({Math.round(breeding.durationMs / 1000)}s)</p>
-          <div style={{ background: "#333", height: 20, width: "100%", borderRadius: 4 }}>
-            <div
-              style={{
-                background: "#0a0",
-                height: "100%",
-                width: `${progress}%`,
-                borderRadius: 4,
-                transition: "width 0.2s",
-              }}
-            />
-          </div>
-          <p style={{ fontSize: 12, color: "#888" }}>{Math.round(progress)}%</p>
-        </div>
-      )}
-
-      {!breeding && (
-        <button
-          onClick={handleStart}
-          disabled={!canStart}
-          style={{ marginBottom: 8 }}
-        >
-          Start Breeding ({Math.round(BREEDING_DURATION_MS / breedSpeed / 1000)}s)
-        </button>
-      )}
+      <div style={{ marginBottom: 8, minHeight: 62 }}>
+        {breeding ? (
+          <>
+            <p style={{ fontSize: 13, margin: "0 0 4px" }}>Breeding in progress... ({Math.round(breeding.durationMs / 1000)}s)</p>
+            <div style={{ background: "#333", height: 20, width: "100%", borderRadius: 4 }}>
+              <div
+                style={{
+                  background: "#0a0",
+                  height: "100%",
+                  width: `${progress}%`,
+                  borderRadius: 4,
+                  transition: "width 0.2s",
+                }}
+              />
+            </div>
+            <p style={{ fontSize: 12, color: "#888", margin: "2px 0 0" }}>{Math.round(progress)}%</p>
+          </>
+        ) : (
+          <button
+            onClick={handleStart}
+            disabled={!canStart}
+          >
+            Start Breeding ({Math.round(BREEDING_DURATION_MS / breedSpeed / 1000)}s)
+          </button>
+        )}
+      </div>
 
       <div style={{ marginTop: 8, padding: 8, background: "#1a1a2e", borderRadius: 6, border: "1px solid #333" }}>
         <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
