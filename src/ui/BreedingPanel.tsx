@@ -83,7 +83,7 @@ export function BreedingPanel({ roster, breeding, dispatch, rng, excludeUnitIds,
   const [keepIfEquivalent, setKeepIfEquivalent] = useState(false);
   const [noRegressionGuard, setNoRegressionGuard] = useState(false);
   const [guardedStats, setGuardedStats] = useState<Set<keyof UnitStats>>(new Set());
-  const [guardMutations, setGuardMutations] = useState(false);
+  const [farmMutations, setGuardMutations] = useState(false);
   const [lastChildInfo, setLastChildInfo] = useState<string | null>(null);
   const [breedSpeed, setBreedSpeed] = useState(1);
   const [variationPct, setVariationPct] = useState(1);
@@ -144,29 +144,51 @@ export function BreedingPanel({ roster, breeding, dispatch, rng, excludeUnitIds,
           // --- Auto-replace logic (key stat) ---
           if (autoBreed && keyStat !== "none") {
             const stat = keyStat;
-            const childVal = child.stats[stat];
-            const aVal = a.stats[stat];
-            const bVal = b.stats[stat];
+            const childMutIds = new Set(child.mutations.map((m) => m.mutationId));
 
-            const aIsWorse = statIsBetter(stat, bVal, aVal);
-            const worseParent = aIsWorse ? a : b;
-            const worseVal = aIsWorse ? aVal : bVal;
+            // Determine replacement target
+            let target: Unit;
+            let targetIsA: boolean;
 
-            if (statIsBetter(stat, childVal, worseVal)) {
-              // Check no-regression guard: child must not regress on guarded stats
-              // compared to the parent it would replace
+            if (farmMutations) {
+              // Farm mode: if child has a mutation one parent lacks, target that parent
+              const aMutIds = new Set(a.mutations.map((m) => m.mutationId));
+              const bMutIds = new Set(b.mutations.map((m) => m.mutationId));
+              const childSpreadsToA = child.mutations.some((m) => !aMutIds.has(m.mutationId) && bMutIds.has(m.mutationId));
+              const childSpreadsToB = child.mutations.some((m) => !bMutIds.has(m.mutationId) && aMutIds.has(m.mutationId));
+
+              if (childSpreadsToA && !childSpreadsToB) {
+                target = a; targetIsA = true;
+              } else if (childSpreadsToB && !childSpreadsToA) {
+                target = b; targetIsA = false;
+              } else {
+                // Both or neither — fall back to worse stat parent
+                const aIsWorse = statIsBetter(stat, b.stats[stat], a.stats[stat]);
+                target = aIsWorse ? a : b;
+                targetIsA = aIsWorse;
+              }
+            } else {
+              const aIsWorse = statIsBetter(stat, b.stats[stat], a.stats[stat]);
+              target = aIsWorse ? a : b;
+              targetIsA = aIsWorse;
+            }
+
+            const targetVal = target.stats[stat];
+            if (!statIsBetter(stat, child.stats[stat], targetVal)) {
+              // Child doesn't beat the target on the key stat — skip replacement
+            } else {
+              // Check no-regression guard
               if (noRegressionGuard && guardedStats.size > 0) {
                 const regressions: string[] = [];
                 for (const gs of guardedStats) {
-                  if (statIsWorseOrEqual(gs, child.stats[gs], worseParent.stats[gs])
-                      && child.stats[gs] !== worseParent.stats[gs]) {
+                  if (statIsWorseOrEqual(gs, child.stats[gs], target.stats[gs])
+                      && child.stats[gs] !== target.stats[gs]) {
                     regressions.push(
-                      `${statLabel(gs)}: ${fmtStatByKey(gs, worseParent.stats[gs])} → ${fmtStatByKey(gs, child.stats[gs])}`,
+                      `${statLabel(gs)}: ${fmtStatByKey(gs, target.stats[gs])} → ${fmtStatByKey(gs, child.stats[gs])}`,
                     );
                   }
                 }
                 if (regressions.length > 0) {
-                  // Would regress — don't replace, dismiss child instead
                   dispatch({ type: "REMOVE_UNIT", unitId: child.id });
                   setLastChildInfo(
                     `Skipped replacement — regression: ${regressions.join(", ")}`,
@@ -175,10 +197,9 @@ export function BreedingPanel({ roster, breeding, dispatch, rng, excludeUnitIds,
                 }
               }
 
-              // Check mutation guard: child must have every mutation the replaced parent has
-              if (guardMutations && worseParent.mutations.length > 0) {
-                const childMutIds = new Set(child.mutations.map((m) => m.mutationId));
-                const missing = worseParent.mutations
+              // Farm mode: child must have every mutation the target parent has
+              if (farmMutations && target.mutations.length > 0) {
+                const missing = target.mutations
                   .filter((m) => !childMutIds.has(m.mutationId))
                   .map((m) => getMutation(m.mutationId).name);
                 if (missing.length > 0) {
@@ -190,15 +211,15 @@ export function BreedingPanel({ roster, breeding, dispatch, rng, excludeUnitIds,
                 }
               }
 
-              dispatch({ type: "REMOVE_UNIT", unitId: worseParent.id });
-              if (aIsWorse) {
+              dispatch({ type: "REMOVE_UNIT", unitId: target.id });
+              if (targetIsA) {
                 setParentA(child.id);
               } else {
                 setParentB(child.id);
               }
               setLastChildInfo(
-                `Replaced ${worseParent.name || worseParent.id.slice(0, 12)} ` +
-                `(${statLabel(stat)}: ${fmtStatByKey(stat, worseVal)} → ${fmtStatByKey(stat, childVal)})`,
+                `Replaced ${target.name || target.id.slice(0, 12)} ` +
+                `(${statLabel(stat)}: ${fmtStatByKey(stat, targetVal)} → ${fmtStatByKey(stat, child.stats[stat])})`,
               );
               return;
             }
@@ -240,7 +261,7 @@ export function BreedingPanel({ roster, breeding, dispatch, rng, excludeUnitIds,
       }
     }, 200);
     return () => clearInterval(id);
-  }, [breeding, findUnit, rng, dispatch, autoBreed, keyStat, autoDismiss, keepIfStatImproved, keepIfNewMutation, keepIfEquivalent, variationPct, noRegressionGuard, guardedStats, guardMutations]);
+  }, [breeding, findUnit, rng, dispatch, autoBreed, keyStat, autoDismiss, keepIfStatImproved, keepIfNewMutation, keepIfEquivalent, variationPct, noRegressionGuard, guardedStats, farmMutations]);
 
   const handleStart = () => {
     if (!parentA || !parentB || parentA === parentB) return;
@@ -443,10 +464,10 @@ export function BreedingPanel({ roster, breeding, dispatch, rng, excludeUnitIds,
                 <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
                   <input
                     type="checkbox"
-                    checked={guardMutations}
+                    checked={farmMutations}
                     onChange={(e) => setGuardMutations(e.target.checked)}
                   />
-                  <span style={{ fontSize: 12 }}>Don't replace if offspring is missing a mutation</span>
+                  <span style={{ fontSize: 12 }}>Farm mutations</span>
                 </label>
               </>
             )}
