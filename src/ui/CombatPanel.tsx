@@ -296,7 +296,7 @@ export function CombatPanel({ roster, money, dispatch, excludeUnitIds, onBattlin
           <select value={enemyIdx} onChange={(e) => setEnemyIdx(Number(e.target.value))}>
             {ENEMY_LADDER.map((e, i) => (
               <option key={e.id} value={i}>
-                {e.name} (DMG:{fmtDmg(e.stats.damage)} HP:{fmtHp(e.stats.hp)} Rate:{fmtRate(e.stats.attackRateMs)}ms)
+                {e.name} (DMG:{fmtDmg(e.stats.damage)} HP:{fmtHp(e.stats.hp)} Rate:{fmtRate(e.stats.attackRateMs)}ms{e.mutations.length > 0 ? ` +${e.mutations.length}mut` : ""})
               </option>
             ))}
           </select>

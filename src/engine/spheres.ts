@@ -83,10 +83,11 @@ export function prospect(budget: number, rng: RNG): Sphere[] {
 
 /**
  * Compute the value range for a mutation at a given tier.
- * Tier scales the base range linearly: tier * [min, max].
+ * Each tier doubles the previous: T1 = base, T2 = 2x, T3 = 4x, etc.
  */
 export function tierValueRange(baseRange: [number, number], tier: number): [number, number] {
-  return [baseRange[0] * tier, baseRange[1] * tier];
+  const scale = Math.pow(2, tier - 1);
+  return [baseRange[0] * scale, baseRange[1] * scale];
 }
 
 /**

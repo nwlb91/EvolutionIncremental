@@ -54,17 +54,19 @@ export const PROSPECT_RESULT_COUNT_MULTIPLIER = 0.02; // 1 Sphere per $50 of bud
 export const PROSPECT_RESULT_COUNT_MIN = 1;
 export const PROSPECT_RESULT_COUNT_MAX = 10;
 
-// Mutation value: tier scales the base range linearly (tier * baseRange)
+// Mutation value: each tier doubles the range (T1=1x, T2=2x, T3=4x, T4=8x…).
 // Carrier spawns at the bottom of the tier's value range (deterministic).
 
 // Enemy ladder
+// Tiers 1-10 (indices 0-9): linear stat scaling so index 9 = maxed human (10/100/200ms).
+// Tiers 11-20 (indices 10-19): capped at max stats, differentiated by mutations.
 export const ENEMY_COUNT = 20;
 export const ENEMY_BASE_DAMAGE = 1;
-export const ENEMY_DAMAGE_SCALING = 1; // +1 per tier
+export const ENEMY_DAMAGE_SCALING = 1; // +1 per tier, caps at STAT_MAX_DAMAGE
 export const ENEMY_BASE_HP = 10;
-export const ENEMY_HP_SCALING = 10; // +10 per tier
+export const ENEMY_HP_SCALING = 10; // +10 per tier, caps at STAT_MAX_HP
 export const ENEMY_BASE_ATTACK_RATE_MS = 2000;
-export const ENEMY_ATTACK_RATE_DECAY = 100; // 2000..100 across 20 tiers (floored at 200)
+export const ENEMY_ATTACK_RATE_DECAY = 200; // -200 per tier, floors at STAT_MIN_ATTACK_RATE_MS
 
 // Combat playback (UI-side, but balance-tunable)
 export const COMBAT_PLAYBACK_SPEED = 1; // 1 = real-time, 2 = 2x speed, etc.
